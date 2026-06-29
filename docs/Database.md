@@ -61,7 +61,7 @@ ow_visit_daily
 | `status`          | 회원 상태         |
 | `provider`        | 소셜 제공자        |
 | `provider_id`     | 소셜 고유 ID      |
-| `face_descriptor` | 얼굴 특징(PCA용 정규화 벡터) JSON |
+| `face_descriptor` | (미사용) 얼굴 데이터는 `/face-data` 파일로 저장 |
 
 ---
 
