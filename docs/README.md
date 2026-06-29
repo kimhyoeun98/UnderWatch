@@ -23,13 +23,48 @@
 ---
 
 # 📷 프로젝트 화면
-
 * 메인 화면
+<img width="1327" height="931" alt="image" src="https://github.com/user-attachments/assets/50e4a9ac-beed-4926-b30c-2fa8419bbc71" />
+
+---
+
 * 로그인
+<img width="584" height="571" alt="image" src="https://github.com/user-attachments/assets/f69dac5b-10c4-4249-8ffa-020a230df4f9" />
+
+---
+
+* 마이페이지
+<img width="1365" height="809" alt="image" src="https://github.com/user-attachments/assets/fb1f4ae6-43a7-44f3-9154-94aa2e29ba4a" />
+<img width="1378" height="665" alt="image" src="https://github.com/user-attachments/assets/33ecd874-8bf0-4e40-a7f4-f8825dd9f0ce" />
+
+---
+
 * 게시판
+<img width="1331" height="381" alt="image" src="https://github.com/user-attachments/assets/523cc47a-be76-42da-989a-360948b8b389" />
+<img width="1338" height="884" alt="image" src="https://github.com/user-attachments/assets/09eb4215-40f0-442b-b7ad-40a2c7685850" />
+<img width="1351" height="346" alt="image" src="https://github.com/user-attachments/assets/e94c6d36-2c40-4f36-96d9-01d5d74d6c7e" />
+
+---
+
 * 게임 정보
+<img width="1359" height="563" alt="image" src="https://github.com/user-attachments/assets/11bd6272-612a-4a6e-b73b-1ca485477cff" />
+<img width="1401" height="744" alt="image" src="https://github.com/user-attachments/assets/7a306397-5016-4e67-aa82-7bce5ec64947" />
+<img width="1359" height="388" alt="image" src="https://github.com/user-attachments/assets/71c0d1ab-16ec-47c7-8e7d-52fad24975eb" />
+
+---
+
 * 관리자 페이지
+<img width="1343" height="285" alt="image" src="https://github.com/user-attachments/assets/ff19ac08-6365-4ff4-9794-ec6f64833b3a" />
+<img width="1342" height="474" alt="image" src="https://github.com/user-attachments/assets/5c5dfec8-0baf-4aa1-ac4b-08223694b7b0" />
+<img width="1357" height="530" alt="image" src="https://github.com/user-attachments/assets/5aead456-ec81-410e-9a8f-0493670889a0" />
+<img width="1356" height="258" alt="image" src="https://github.com/user-attachments/assets/f69af6ee-3558-407e-8c3a-a40bea74365d" />
+<img width="1361" height="318" alt="image" src="https://github.com/user-attachments/assets/6798e029-5581-4e79-9818-dc62acdf7c58" />
+
+---
+
 * 얼굴 로그인
+<img width="687" height="612" alt="image" src="https://github.com/user-attachments/assets/308f64d6-c9f1-4196-a33f-ff330423091d" />
+<img width="1318" height="331" alt="image" src="https://github.com/user-attachments/assets/da43604a-da2f-4b54-a530-2b0ecc68fc24" />
 
 ---
 
@@ -327,7 +362,7 @@ http://underwatch.local:8080
 | --- | --- |
 | [docs/Architecture.md](docs/Architecture.md) | 전체 구조·요청 흐름·단일 컨텍스트·레이어 |
 | [docs/OAuth.md](docs/OAuth.md) | 카카오·네이버·구글 소셜 로그인 구현 |
-| [docs/FaceLogin.md](docs/FaceLogin.md) | LBPH 직접 구현 1:N 얼굴 로그인 |
+| [docs/FaceLogin.md](docs/FaceLogin.md) | LBPH 구현 1:N 얼굴 로그인 |
 | [docs/Database.md](docs/Database.md) | 테이블 스키마·마이그레이션·ERD |
 | [docs/DevelopmentStory.md](docs/DevelopmentStory.md) | 개발하며 겪은 문제와 해결 상세 |
 
@@ -346,5 +381,5 @@ http://underwatch.local:8080
 
 # 👨‍💻 개발자
 
-한국폴리텍대학 AI소프트웨어과
+한국폴리텍대학 AI소프트웨어과 김효은
 Backend Developer Portfolio Project

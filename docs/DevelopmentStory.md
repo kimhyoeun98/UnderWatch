@@ -1,4 +1,4 @@
-# Development Story
+# Development Story 
 
 UnderWatch 개발 중 발생한 주요 문제와 해결 과정을 정리한 문서입니다.
 

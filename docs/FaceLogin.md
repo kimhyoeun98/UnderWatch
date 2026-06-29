@@ -1,4 +1,4 @@
-# 얼굴 인식 로그인
+# 얼굴 인식 로그인 
 
 **LBPH(Local Binary Patterns Histogram)** 알고리즘을 사용하여 구현한 1:N 얼굴 로그인 문서입니다.
 
