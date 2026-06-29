@@ -1,4 +1,4 @@
-# Database
+# Database 
 
 Oracle XE 기반 데이터베이스 구조 문서입니다.
 모든 테이블 접두사는 `ow_`입니다.
