@@ -346,5 +346,5 @@ http://underwatch.local:8080
 
 # 👨‍💻 개발자
 
-한국폴리텍대학 AI소프트웨어과
+한국폴리텍대학 AI소프트웨어과 김효은
 Backend Developer Portfolio Project
