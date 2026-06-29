@@ -64,7 +64,7 @@ Spring Security 기본 로그인
 
 ### ✔ Face Login
 
-* LBPH 알고리즘 직접 구현 (외부 라이브러리/모델 없음)
+* LBPH 알고리즘 구현 
 * 얼굴 특징(히스토그램) 등록
 * 1:N 얼굴 비교
 * 아이디 입력 없이 로그인
@@ -93,11 +93,11 @@ Spring Security 기본 로그인
 
 ## 게임 정보
 
-OverFast API + Blizzard 패치노트 연동
+OverFast API + Blizzard 패치노트 링크 연결
 
 * 영웅 목록 · 역할별 필터 · 스킬 · 체력 · 배경 이야기
 * 맵 목록 (맵 이름 · 게임 모드 한글화)
-* 패치 노트 (공식 패치노트 목록 — 제목 · 날짜 · 원문 링크 · 썸네일)
+* 패치 노트 연결
 
 ---
 
@@ -111,7 +111,7 @@ OverFast API + Blizzard 패치노트 연동
 
 ---
 
-# ⭐ 핵심 구현
+# 핵심 구현
 
 ## 1. 하나의 Principal로 세 가지 로그인 통합
 
@@ -152,7 +152,7 @@ LBPH 히스토그램
 
 * 영웅: 목록(역할별) · 상세 — 한국어(`locale=ko-kr`)
 * 맵: 목록 — 맵 이름 · 게임 모드 한글 보강
-* 패치 노트: 공식 페이지를 파싱해 제목 · 날짜 · **원문 링크** · 썸네일 제공
+* 패치 노트: **원문 링크** · 썸네일 제공
 
 ---
 
@@ -233,7 +233,7 @@ LBPH 히스토그램
 | Build            | Maven             |
 | Server           | Tomcat 11         |
 | External API     | OverFast API · Blizzard 패치노트 |
-| Face Recognition | LBPH (직접 구현)   |
+| Face Recognition | LBPH              |
 
 ---
 
@@ -339,11 +339,12 @@ http://underwatch.local:8080
 # 🔧 향후 개선 사항
 
 * HTTPS 적용
-* WebAuthn 적용
+* WebAuthn 적용 (얼굴 인식 로그인)
 * 얼굴 라이브니스 검출
 * OAuth Secret 관리 개선
 * API 캐싱 적용
 * Redis 기반 알림 기능 개선
+* 패치노트 게시판 화
 
 ---
 
