@@ -13,7 +13,7 @@ import javax.imageio.ImageIO;
 import org.springframework.stereotype.Component;
 
 /**
- * M-09 얼굴 인식 — Eigenfaces(PCA) 직접 구현 (모델 영속화 버전).
+ * M-09 얼굴 인식 — Eigenfaces(PCA) (모델 영속화 버전).
  *
  * 외부 라이브러리/학습모델 없이 순수 JDK 만으로:
  *   1) [학습 1회] 초기 등록 얼굴들로 평균 얼굴 + 고유얼굴(주성분) 공간을 만든다(buildModel).
