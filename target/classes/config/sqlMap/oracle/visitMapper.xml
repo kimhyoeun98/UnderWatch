@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="visit.dao.VisitDAO">
+
+  <update id="recordVisit">
+    MERGE INTO ow_visit_daily d
+    USING (SELECT TRUNC(SYSDATE) AS vday FROM dual) s
+       ON (d.visit_date = s.vday)
+     WHEN MATCHED THEN
+       UPDATE SET visit_count = visit_count + 1
+     WHEN NOT MATCHED THEN
+       INSERT (visit_date, visit_count) VALUES (s.vday, 1)
+  </update>
+
+  <select id="selectRecent" resultType="visitVO">
+    SELECT TO_CHAR(visit_date, 'yyyy-mm-dd') AS visit_date, visit_count
+      FROM ow_visit_daily
+     WHERE visit_date >= TRUNC(SYSDATE) - 13
+     ORDER BY visit_date DESC
+  </select>
+
+</mapper>

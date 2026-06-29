@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="message.dao.MessageDAO">
+
+  <insert id="insert" parameterType="messageVO">
+    INSERT INTO ow_message(no, sender_id, receiver_id, content)
+    VALUES(seq_ow_message_no.NEXTVAL, #{senderId}, #{receiverId}, #{content})
+  </insert>
+
+  <select id="selectReceived" parameterType="string" resultType="messageVO">
+    SELECT m.no, m.sender_id, s.nickname AS sender_nickname,
+           m.receiver_id, m.content, m.is_read,
+           TO_CHAR(m.reg_date, 'yyyy-mm-dd hh24:mi') AS reg_date
+      FROM ow_message m
+      JOIN ow_member s ON m.sender_id = s.id
+     WHERE m.receiver_id = #{receiverId}
+     ORDER BY m.no DESC
+  </select>
+
+  <select id="selectSent" parameterType="string" resultType="messageVO">
+    SELECT m.no, m.receiver_id, r.nickname AS receiver_nickname,
+           m.sender_id, m.content, m.is_read,
+           TO_CHAR(m.reg_date, 'yyyy-mm-dd hh24:mi') AS reg_date
+      FROM ow_message m
+      JOIN ow_member r ON m.receiver_id = r.id
+     WHERE m.sender_id = #{senderId}
+     ORDER BY m.no DESC
+  </select>
+
+  <update id="markRead">
+    UPDATE ow_message SET is_read = 'Y'
+     WHERE no = #{no} AND receiver_id = #{receiverId}
+  </update>
+
+  <update id="markAllRead">
+    UPDATE ow_message SET is_read = 'Y'
+     WHERE receiver_id = #{myId} AND sender_id = #{partnerId} AND is_read = 'N'
+  </update>
+
+  <select id="countUnread" parameterType="string" resultType="int">
+    SELECT COUNT(*) FROM ow_message
+     WHERE receiver_id = #{receiverId} AND is_read = 'N'
+  </select>
+
+  <!-- 대화 상대 목록 (내가 삭제하지 않은 메시지만 기준) -->
+  <select id="selectConversations" parameterType="string" resultType="conversationVO">
+    SELECT partner_id,
+           partner_nickname,
+           unread_count,
+           TO_CHAR(last_date, 'yyyy-mm-dd hh24:mi') AS last_date
+      FROM (
+             SELECT partner_id,
+                    MAX(partner_nickname) AS partner_nickname,
+                    SUM(unread_count)     AS unread_count,
+                    MAX(last_date)        AS last_date
+               FROM (
+                      SELECT m.receiver_id AS partner_id,
+                             r.nickname    AS partner_nickname,
+                             0             AS unread_count,
+                             m.reg_date    AS last_date
+                        FROM ow_message m
+                        JOIN ow_member  r ON m.receiver_id = r.id
+                       WHERE m.sender_id = #{myId}
+                         AND m.sender_deleted = 'N'
+                      UNION ALL
+                      SELECT m.sender_id AS partner_id,
+                             s.nickname  AS partner_nickname,
+                             CASE WHEN m.is_read = 'N' THEN 1 ELSE 0 END AS unread_count,
+                             m.reg_date  AS last_date
+                        FROM ow_message m
+                        JOIN ow_member  s ON m.sender_id = s.id
+                       WHERE m.receiver_id = #{myId}
+                         AND m.receiver_deleted = 'N'
+                    )
+              GROUP BY partner_id
+           )
+     ORDER BY last_date DESC
+  </select>
+
+  <!-- 채팅 스레드 (내가 삭제한 메시지는 제외) -->
+  <select id="selectThread" resultType="messageVO">
+    SELECT m.no,
+           m.sender_id,
+           s.nickname AS sender_nickname,
+           m.receiver_id,
+           m.content,
+           m.is_read,
+           TO_CHAR(m.reg_date, 'yyyy-mm-dd hh24:mi') AS reg_date
+      FROM ow_message m
+      JOIN ow_member  s ON m.sender_id = s.id
+     WHERE (m.sender_id = #{myId}      AND m.receiver_id = #{partnerId} AND m.sender_deleted   = 'N')
+        OR (m.sender_id = #{partnerId} AND m.receiver_id = #{myId}      AND m.receiver_deleted = 'N')
+     ORDER BY m.no ASC
+  </select>
+
+  <!-- 대화방 나가기: 나와 관련된 모든 메시지를 나에게만 삭제 -->
+  <update id="leaveConversation">
+    UPDATE ow_message
+       SET sender_deleted   = CASE WHEN sender_id   = #{myId} THEN 'Y' ELSE sender_deleted   END,
+           receiver_deleted = CASE WHEN receiver_id = #{myId} THEN 'Y' ELSE receiver_deleted END
+     WHERE (sender_id = #{myId} AND receiver_id = #{partnerId})
+        OR (sender_id = #{partnerId} AND receiver_id = #{myId})
+  </update>
+
+  <!-- 나에게만 삭제 (상대방에겐 유지) -->
+  <update id="deleteForMe">
+    UPDATE ow_message
+       SET sender_deleted   = CASE WHEN sender_id   = #{myId} THEN 'Y' ELSE sender_deleted   END,
+           receiver_deleted = CASE WHEN receiver_id = #{myId} THEN 'Y' ELSE receiver_deleted END
+     WHERE no = #{no}
+       AND (sender_id = #{myId} OR receiver_id = #{myId})
+  </update>
+
+</mapper>

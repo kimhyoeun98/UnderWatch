@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="notification.dao.NotificationDAO">
+
+  <insert id="insert" parameterType="notificationVO">
+    INSERT INTO ow_notification(no, user_id, content, link)
+    VALUES(seq_ow_notification_no.NEXTVAL, #{userId}, #{content}, #{link})
+  </insert>
+
+  <select id="selectByUser" parameterType="string" resultType="notificationVO">
+    SELECT no, user_id, content, link, is_read,
+           TO_CHAR(reg_date, 'yyyy-mm-dd hh24:mi') AS reg_date
+      FROM ow_notification
+     WHERE user_id = #{userId}
+     ORDER BY no DESC
+  </select>
+
+  <update id="markAllRead" parameterType="string">
+    UPDATE ow_notification SET is_read = 'Y'
+     WHERE user_id = #{userId} AND is_read = 'N'
+  </update>
+
+  <select id="countUnread" parameterType="string" resultType="int">
+    SELECT COUNT(*) FROM ow_notification
+     WHERE user_id = #{userId} AND is_read = 'N'
+  </select>
+
+</mapper>

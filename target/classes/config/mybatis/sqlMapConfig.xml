@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration
+  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+  "https://mybatis.org/dtd/mybatis-3-config.dtd">
+
+<configuration>
+
+  <settings>
+    <!-- 카멜케이스 자동 매핑: DB의 writer_id → VO의 writerId -->
+    <setting name="mapUnderscoreToCamelCase" value="true" />
+    <!-- null 파라미터도 처리 -->
+    <setting name="jdbcTypeForNull" value="NULL" />
+  </settings>
+
+  <typeAliases>
+    <typeAlias type="kr.ac.kopo.member.vo.MemberVO"         alias="memberVO" />
+    <typeAlias type="kr.ac.kopo.board.vo.BoardCategoryVO"   alias="boardCategoryVO" />
+    <typeAlias type="kr.ac.kopo.board.vo.BoardVO"           alias="boardVO" />
+    <typeAlias type="kr.ac.kopo.board.vo.SearchVO"          alias="searchVO" />
+    <typeAlias type="kr.ac.kopo.comment.vo.CommentVO"       alias="commentVO" />
+    <typeAlias type="kr.ac.kopo.report.vo.ReportVO"         alias="reportVO" />
+    <typeAlias type="kr.ac.kopo.visit.vo.VisitVO"           alias="visitVO" />
+    <typeAlias type="kr.ac.kopo.party.vo.PartyVO"           alias="partyVO" />
+    <typeAlias type="kr.ac.kopo.message.vo.MessageVO"        alias="messageVO" />
+    <typeAlias type="kr.ac.kopo.message.vo.ConversationVO"  alias="conversationVO" />
+    <typeAlias type="kr.ac.kopo.notification.vo.NotificationVO" alias="notificationVO" />
+  </typeAliases>
+
+</configuration>
