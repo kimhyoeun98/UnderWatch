@@ -1,0 +1,125 @@
+============================================================
+ 					UNDERWATCH URI 정책
+============================================================
+
+[설계 원칙]
+ - 도메인(board / member / comment / message / notification / party / report / game / admin)별로 URI를 묶는다
+ - 조회는 GET, 생성·수정·삭제 등 상태 변경은 POST 를 사용
+ - 뷰는 /WEB-INF/jsp/{경로}.jsp 로 매핑
+ - AJAX 응답(@ResponseBody)은 JSON 또는 문자열을 직접 반환한다
+ - 처리 후에는 redirect 로 화면을 이동한다.
+
+[권한 표기]
+ ALL   = 비로그인 포함 누구나
+ USER  = 로그인 사용자
+ ADMIN = 관리자(ROLE_ADMIN)
+
+
+*** 메인 ***
+기능              | METHOD | URI            | 권한  | 결과
+메인페이지         | GET    | /              | ALL  | index.jsp (최근글/카테고리/모집중 파티)
+접근 거부(403)     | GET    | /error/403     | ALL  | error/403.jsp
+
+
+*** 인증 / 보안 (Spring Security 처리) ***
+기능              | METHOD | URI                                   | 권한  | 결과
+로그인 화면        | GET    | /member/login                         | ALL  | member/login.jsp
+폼 로그인 처리      | POST   | /member/loginProc (id, password)      | ALL  | 성공 → / , 실패 → /member/login?error=true
+로그아웃          | POST   | /member/logout                        | USER | redirect:/
+소셜 로그인 시작    | GET    | /oauth2/authorization/{kakao|naver|google} | ALL | 각 제공자 인가 페이지로 이동
+소셜 로그인 콜백    | GET    | /login/oauth2/code/{registrationId}   | ALL  | 회원 연동 후 redirect:/
+
+
+*** 회원 (member) ***
+기능              | METHOD | URI                          | 권한  | 결과
+회원가입 폼        | GET    | /member/register             | ALL  | member/register.jsp
+회원가입 처리       | POST   | /member/register             | ALL  | redirect:/member/login?registered=true
+아이디 중복확인     | GET    | /member/idCheck?id=          | ALL  | 문자열 "OK" / "DUPLICATE"
+닉네임 중복확인     | GET    | /member/nicknameCheck?nickname= | ALL | 문자열 "OK" / "DUPLICATE"
+이메일 중복확인     | GET    | /member/emailCheck?email=    | ALL  | 문자열 "OK" / "DUPLICATE"
+마이페이지         | GET    | /member/mypage               | USER | member/mypage.jsp (내정보/등급/활동내역)
+내정보 수정        | POST   | /member/mypage/info          | USER | redirect:/member/mypage?updated=true
+비밀번호 변경      | POST   | /member/mypage/password      | USER | redirect:/member/mypage?pwChanged=true
+프로필 사진 업로드  | POST   | /member/mypage/profile       | USER | redirect:/member/mypage
+
+
+*** 얼굴 로그인 (member/face — LBPH 직접 구현) ***
+기능              | METHOD | URI                       | 권한  | 결과
+얼굴 등록          | POST   | /member/face/register     | USER | JSON {success, message}  (param: image)
+얼굴 로그인 화면    | GET    | /member/face/login        | ALL  | member/faceLogin.jsp
+얼굴 로그인 처리    | POST   | /member/face/loginProc    | ALL  | JSON {success, redirect|message}  (param: image)
+
+
+*** 게시판 (board) ***
+기능              | METHOD | URI                           | 권한  | 결과
+목록(검색/페이징)   | GET    | /board/list?categoryNo=&searchType=&keyword=&currentPage= | ALL | board/list.jsp
+상세              | GET    | /board/detail?no=3            | ALL  | board/detail.jsp (조회수 쿠키 중복방지)
+작성 폼           | GET    | /board/write                  | USER | board/write.jsp
+작성 처리          | POST   | /board/write                  | USER | redirect:/board/detail?no={새글번호}
+수정 폼           | GET    | /board/edit?no=3              | USER | board/edit.jsp (작성자 본인만)
+수정 처리          | POST   | /board/edit                   | USER | redirect:/board/detail?no={번호}
+삭제              | POST   | /board/delete?no=3            | USER | redirect:/board/list (작성자/관리자)
+추천              | POST   | /board/like?no=3              | USER | redirect:/board/detail?no=3
+비추천            | POST   | /board/dislike?no=3           | USER | redirect:/board/detail?no=3
+이미지 다운로드     | GET    | /board/download?no=3          | ALL  | 파일 스트림(첨부 이미지)
+
+
+*** 댓글 (comment) ***
+기능              | METHOD | URI               | 권한  | 결과
+댓글 등록          | POST   | /comment/write    | USER | redirect:/board/detail?no={boardNo} (대댓글은 parentNo)
+댓글 삭제          | POST   | /comment/delete   | USER | redirect:/board/detail?no={boardNo} (작성자 본인)
+
+
+*** 신고 (report) ***
+기능              | METHOD | URI        | 권한  | 결과
+게시글/댓글 신고    | POST   | /report    | USER | redirect:/board/detail?no={boardNo} (중복신고 방지)
+
+
+*** 쪽지 (message) ***
+기능              | METHOD | URI                        | 권한  | 결과
+대화 목록          | GET    | /message                   | USER | message/list.jsp
+채팅 스레드         | GET    | /message/chat?with={id}    | USER | message/chat.jsp (열람 시 읽음처리)
+쪽지 보내기 폼      | GET    | /message/write?to={id}     | USER | message/write.jsp
+쪽지 보내기 처리    | POST   | /message/write             | USER | redirect:/message (또는 /message/chat?with=)
+읽음 처리          | POST   | /message/read?no=          | USER | redirect:/message
+나에게만 삭제       | POST   | /message/delete?no=&partnerId= | USER | redirect:/message/chat?with={partnerId}
+대화방 나가기       | POST   | /message/leave?partnerId=  | USER | redirect:/message
+
+
+*** 알림 (notification) ***
+기능              | METHOD | URI                     | 권한  | 결과
+알림 목록          | GET    | /notification           | USER | notification/list.jsp
+전체 읽음          | POST   | /notification/readAll   | USER | redirect:/notification
+
+
+*** 파티/구인 (party) ***
+기능              | METHOD | URI                        | 권한  | 결과
+모집 목록(필터)     | GET    | /party/list?roleType=&tier=&micYn= | ALL | party/list.jsp
+모집글 작성 폼      | GET    | /party/write               | USER | party/write.jsp
+모집글 작성 처리    | POST   | /party/write               | USER | redirect:/party/list
+모집 상태 토글      | POST   | /party/status?no=          | USER | redirect:/party/list (모집중<->완료, 본인만)
+
+
+*** 게임 정보 (game) ***
+기능              | METHOD | URI                    | 권한  | 결과
+영웅 목록          | GET    | /game/heroes           | ALL  | game/heroes.jsp (역할별 분류)
+영웅 상세          | GET    | /game/heroes/{key}     | ALL  | game/hero.jsp
+맵 목록           | GET    | /game/maps             | ALL  | game/maps.jsp
+패치 노트          | GET    | /game/patches          | ALL  | game/patches.jsp
+
+
+*** 관리자 (admin — ROLE_ADMIN) ***
+기능              | METHOD | URI                          | 권한   | 결과
+대시보드           | GET    | /admin                       | ADMIN | admin/dashboard.jsp (회원수/글수/카테고리수)
+회원 관리          | GET    | /admin/members               | ADMIN | admin/members.jsp
+회원 상태 변경      | POST   | /admin/members/status        | ADMIN | redirect:/admin/members (본인 제외)
+회원 권한 변경      | POST   | /admin/members/role          | ADMIN | redirect:/admin/members (본인 제외)
+카테고리 관리       | GET    | /admin/categories            | ADMIN | admin/categories.jsp
+카테고리 추가       | POST   | /admin/categories/add        | ADMIN | redirect:/admin/categories
+카테고리 수정       | POST   | /admin/categories/edit       | ADMIN | redirect:/admin/categories
+카테고리 삭제       | POST   | /admin/categories/delete?no= | ADMIN | redirect:/admin/categories
+신고 목록          | GET    | /admin/reports               | ADMIN | admin/reports.jsp
+신고 처리(블라인드) | POST   | /admin/reports/blind         | ADMIN | redirect:/admin/reports
+방문자 통계         | GET    | /admin/stats                 | ADMIN | admin/stats.jsp
+
+

@@ -1,0 +1,27 @@
+# =============================================================
+# M-03 소셜 로그인 OAuth2 키 설정 (예시 템플릿)
+#
+# 이 파일을 복사해 oauth.properties 로 만들고, 발급받은 값을 채우세요.
+#   (Windows) copy oauth.properties.example oauth.properties
+#   (bash)    cp oauth.properties.example oauth.properties
+#
+# 실제 키가 들어가는 oauth.properties 는 .gitignore 로 커밋에서 제외됩니다(키 노출 방지).
+# clientId 가 비어 있는 제공자는 자동으로 비활성화됩니다(앱은 정상 기동).
+#
+# 콘솔에 등록할 Redirect URI (localhost 기준 — 접속도 localhost:8080 으로 통일):
+#   카카오 : http://localhost:8080/login/oauth2/code/kakao
+#   네이버 : http://localhost:8080/login/oauth2/code/naver
+#   구글   : http://localhost:8080/login/oauth2/code/google
+# =============================================================
+
+# --- 카카오 (REST API 키 = clientId, 콘솔 '보안'에서 Client Secret 발급) ---
+oauth.kakao.client-id=
+oauth.kakao.client-secret=
+
+# --- 네이버 ---
+oauth.naver.client-id=
+oauth.naver.client-secret=
+
+# --- 구글 ---
+oauth.google.client-id=
+oauth.google.client-secret=

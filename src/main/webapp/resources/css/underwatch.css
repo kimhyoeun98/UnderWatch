@@ -1,0 +1,544 @@
+/* =============================================================
+   UnderWatch 테마 — 오버워치풍 다크 + 주황
+   색/폰트/컴포넌트를 이 파일 한 곳에서 관리한다.
+   ============================================================= */
+
+:root {
+  /* 브랜드 컬러 */
+  --ow-orange:        #f99e1a;
+  --ow-orange-bright: #ffb84d;
+  --ow-orange-dark:   #c77d12;
+  --ow-blue:          #33a0dc;  /* 보조 액센트 */
+
+  /* 배경 단계 (어두움 → 밝음) */
+  --ow-bg:        #0d141d;  /* 페이지 바탕 */
+  --ow-bg-2:      #121d29;  /* 네비/푸터 */
+  --ow-panel:     #18283a;  /* 카드 본문 */
+  --ow-panel-hi:  #20344a;  /* 카드 헤더 / hover */
+
+  --ow-border:    #2a3d52;
+  --ow-text:      #e6ecf2;
+  --ow-text-muted:#8fa3b6;
+
+  --ow-radius:    4px;
+}
+
+/* ---------- 기본 ---------- */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ow-bg);
+  color: var(--ow-text);
+  font-family: 'Noto Sans KR', 'Segoe UI', sans-serif;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6,
+.ow-head {
+  font-family: 'Oswald', 'Noto Sans KR', sans-serif;
+  letter-spacing: .5px;
+  font-weight: 600;
+}
+
+a { color: var(--ow-orange); text-decoration: none; }
+a:hover { color: var(--ow-orange-bright); }
+
+.ow-main { flex: 1 0 auto; }
+
+/* 본문 텍스트 보조색 */
+.text-muted { color: var(--ow-text-muted) !important; }
+
+/* ---------- 네비게이션 바 ---------- */
+.ow-navbar {
+  background: var(--ow-bg-2);
+  border-bottom: 2px solid var(--ow-orange);
+}
+.ow-navbar .navbar-brand {
+  font-family: 'Oswald', sans-serif;
+  font-weight: 700;
+  font-size: 1.55rem;
+  letter-spacing: 1px;
+  color: var(--ow-orange);
+  text-transform: uppercase;
+}
+.ow-navbar .navbar-brand:hover { color: var(--ow-orange-bright); }
+.ow-navbar .nav-link {
+  color: var(--ow-text);
+  font-weight: 500;
+  position: relative;
+  transition: color .15s;
+}
+.ow-navbar .nav-link:hover { color: var(--ow-orange); }
+.ow-navbar .navbar-toggler {
+  border-color: var(--ow-border);
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* ---------- 카테고리 서브 네비게이션 ---------- */
+.ow-subnav {
+  background: var(--ow-panel);
+  border-bottom: 1px solid var(--ow-border);
+}
+.ow-subnav .container {
+  display: flex;
+  flex-wrap: wrap;
+}
+.ow-subnav-link {
+  padding: .7rem 1.15rem;
+  color: var(--ow-text);
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: .5px;
+  border-bottom: 2px solid transparent;
+  transition: color .15s, background .15s;
+}
+.ow-subnav-link:hover {
+  color: var(--ow-orange);
+  background: var(--ow-panel-hi);
+}
+.ow-subnav-link.active {
+  color: var(--ow-orange);
+  border-bottom-color: var(--ow-orange);
+}
+
+/* ---------- 히어로 배너 ---------- */
+.ow-hero {
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(13,20,29,.85), rgba(18,29,41,.7)),
+    linear-gradient(120deg, #16273a 0%, #0d141d 60%, #1a1430 100%);
+  border-bottom: 1px solid var(--ow-border);
+  padding: 4.5rem 1rem;
+  text-align: center;
+  overflow: hidden;
+}
+.ow-hero::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--ow-orange), transparent);
+}
+/* 메인용 축소 배너 — 게시판이 바로 보이도록 */
+.ow-hero-sm { padding: 1.75rem 1rem; }
+.ow-hero-sm h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); }
+.ow-hero-sm p { font-size: 1rem; margin-top: .35rem; }
+
+.ow-hero h1 {
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  color: var(--ow-orange);
+  text-transform: uppercase;
+  margin: 0;
+  text-shadow: 0 2px 18px rgba(249,158,26,.25);
+}
+.ow-hero p {
+  color: var(--ow-text);
+  font-size: 1.15rem;
+  margin-top: .75rem;
+  opacity: .9;
+}
+
+/* ---------- 카드 / 패널 ---------- */
+.card {
+  background: var(--ow-panel);
+  border: 1px solid var(--ow-border);
+  border-radius: var(--ow-radius);
+  color: var(--ow-text);
+}
+.card-header {
+  background: var(--ow-panel-hi);
+  border-bottom: 2px solid var(--ow-orange);
+  color: var(--ow-text);
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: .5px;
+  font-weight: 600;
+}
+.card-footer {
+  background: transparent;
+  border-top: 1px solid var(--ow-border);
+}
+
+/* 메인 섹션 카드 제목 강조 바 */
+.ow-section-title {
+  font-family: 'Oswald', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  border-left: 4px solid var(--ow-orange);
+  padding-left: .6rem;
+  margin: 0;
+}
+
+/* ---------- 버튼 ---------- */
+.btn-warning,
+.btn-ow {
+  background: var(--ow-orange);
+  border: 1px solid var(--ow-orange);
+  color: #16110a;
+  font-weight: 600;
+  letter-spacing: .3px;
+  border-radius: var(--ow-radius);
+}
+.btn-warning:hover,
+.btn-ow:hover {
+  background: var(--ow-orange-bright);
+  border-color: var(--ow-orange-bright);
+  color: #16110a;
+}
+.btn-dark {
+  background: var(--ow-panel-hi);
+  border: 1px solid var(--ow-border);
+  color: var(--ow-text);
+}
+.btn-dark:hover {
+  background: var(--ow-orange);
+  border-color: var(--ow-orange);
+  color: #16110a;
+}
+.btn-outline-secondary,
+.btn-outline-dark {
+  border-color: var(--ow-border);
+  color: var(--ow-text-muted);
+}
+.btn-outline-secondary:hover,
+.btn-outline-dark:hover {
+  background: var(--ow-panel-hi);
+  border-color: var(--ow-orange);
+  color: var(--ow-orange);
+}
+.btn-outline-primary {
+  border-color: var(--ow-blue);
+  color: var(--ow-blue);
+}
+.btn-outline-primary:hover {
+  background: var(--ow-blue);
+  color: #08151d;
+}
+.btn-outline-danger { border-color: #c0504d; color: #e07b78; }
+.btn-outline-danger:hover { background: #c0504d; color: #fff; }
+
+/* ---------- 테이블 ---------- */
+.table {
+  --bs-table-bg: transparent;
+  color: var(--ow-text);
+  border-color: var(--ow-border);
+  margin: 0;
+}
+.table > :not(caption) > * > * {
+  background: transparent;
+  border-bottom-color: var(--ow-border);
+  color: var(--ow-text);
+  padding: .7rem .75rem;
+}
+.table thead.table-dark th,
+.table thead th {
+  background: var(--ow-panel-hi);
+  color: var(--ow-orange);
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: .5px;
+  border-bottom: 2px solid var(--ow-orange);
+}
+.table-hover > tbody > tr:hover > * {
+  background: rgba(249,158,26,.08);
+  color: var(--ow-text);
+}
+.table a { color: var(--ow-text); }
+.table a:hover { color: var(--ow-orange); }
+
+/* ---------- 폼 ---------- */
+.form-control,
+.form-select {
+  background: var(--ow-bg-2);
+  border: 1px solid var(--ow-border);
+  color: var(--ow-text);
+  border-radius: var(--ow-radius);
+}
+.form-control::placeholder { color: #5f7488; }
+.form-control:focus,
+.form-select:focus {
+  background: var(--ow-bg-2);
+  border-color: var(--ow-orange);
+  color: var(--ow-text);
+  box-shadow: 0 0 0 .2rem rgba(249,158,26,.2);
+}
+.form-control[readonly] { background: #0f1822; color: var(--ow-text-muted); }
+.form-label { color: var(--ow-text-muted); font-weight: 500; }
+.form-select option { background: var(--ow-bg-2); color: var(--ow-text); }
+
+/* ---------- 배지 ---------- */
+.badge.bg-secondary {
+  background: var(--ow-panel-hi) !important;
+  color: var(--ow-orange);
+  border: 1px solid var(--ow-border);
+  font-weight: 500;
+}
+.badge.bg-warning {
+  background: var(--ow-orange) !important;
+  color: #16110a !important;
+}
+
+/* ---------- 리스트 그룹 ---------- */
+.list-group-item {
+  background: transparent;
+  border-color: var(--ow-border);
+  color: var(--ow-text);
+}
+.list-group-item a { color: var(--ow-text); }
+.list-group-item a:hover { color: var(--ow-orange); }
+
+/* ---------- 페이지네이션 ---------- */
+.pagination .page-link {
+  background: var(--ow-panel);
+  border-color: var(--ow-border);
+  color: var(--ow-text);
+}
+.pagination .page-link:hover {
+  background: var(--ow-panel-hi);
+  color: var(--ow-orange);
+}
+.pagination .page-item.active .page-link {
+  background: var(--ow-orange);
+  border-color: var(--ow-orange);
+  color: #16110a;
+}
+
+/* ---------- 탭 ---------- */
+.nav-tabs {
+  border-bottom: 1px solid var(--ow-border);
+}
+.nav-tabs .nav-link {
+  color: var(--ow-text-muted);
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: .5px;
+}
+.nav-tabs .nav-link:hover { color: var(--ow-text); }
+.nav-tabs .nav-link.active {
+  background: transparent;
+  color: var(--ow-orange);
+  border-bottom: 2px solid var(--ow-orange);
+}
+
+/* ---------- 알림 ---------- */
+.alert-success {
+  background: rgba(45,160,90,.12);
+  border: 1px solid #2d8a55;
+  color: #74d39a;
+}
+.alert-danger {
+  background: rgba(192,80,77,.12);
+  border: 1px solid #c0504d;
+  color: #e9928f;
+}
+
+/* ---------- 게시글 본문 / 댓글 ---------- */
+.board-content {
+  min-height: 200px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--ow-bg-2) !important;
+  border: 1px solid var(--ow-border) !important;
+  color: var(--ow-text);
+}
+.comment-reply {
+  margin-left: 2rem;
+  border-left: 3px solid var(--ow-orange);
+  padding-left: 1rem;
+}
+.text-danger { color: #e9928f !important; }
+.text-primary { color: var(--ow-blue) !important; }
+
+/* ---------- 푸터 ---------- */
+.ow-footer {
+  flex-shrink: 0;
+  background: var(--ow-bg-2);
+  border-top: 2px solid var(--ow-orange);
+  color: var(--ow-text-muted);
+  padding: 1.25rem 0;
+  text-align: center;
+}
+
+/* ---------- 인증 카드(로그인/회원가입) ---------- */
+.ow-auth-head {
+  background: var(--ow-bg-2);
+  border-bottom: 2px solid var(--ow-orange);
+  text-align: center;
+  color: var(--ow-orange);
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: 1px;
+}
+
+/* =============================================================
+   게임정보(영웅) — 목록 / 상세
+   ============================================================= */
+:root {
+  --role-tank:    #3a96d4;   /* 탱커 - 파랑 */
+  --role-damage:  #e0673a;   /* 딜러 - 주홍 */
+  --role-support: #5cc15c;   /* 지원가 - 초록 */
+}
+
+/* 역할 필터 탭 */
+.ow-role-tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.25rem; }
+.ow-role-tab {
+  font-family: 'Oswald', sans-serif; letter-spacing: .5px; text-transform: uppercase;
+  padding: .45rem 1.15rem; border: 1px solid var(--ow-border); border-radius: var(--ow-radius);
+  background: var(--ow-panel); color: var(--ow-text-muted); cursor: pointer; transition: all .15s;
+}
+.ow-role-tab:hover { color: var(--ow-text); border-color: var(--ow-orange); }
+.ow-role-tab.active                       { background: var(--ow-orange);   border-color: var(--ow-orange);   color: #16110a; }
+.ow-role-tab[data-role="tank"].active     { background: var(--role-tank);    border-color: var(--role-tank);    color: #fff; }
+.ow-role-tab[data-role="damage"].active   { background: var(--role-damage);  border-color: var(--role-damage);  color: #fff; }
+.ow-role-tab[data-role="support"].active  { background: var(--role-support); border-color: var(--role-support); color: #16110a; }
+
+/* 영웅 카드 (목록) */
+.ow-hero-card {
+  position: relative; display: block; overflow: hidden;
+  background: var(--ow-panel); border: 1px solid var(--ow-border);
+  border-top: 3px solid var(--ow-border); border-radius: var(--ow-radius);
+  transition: transform .15s, box-shadow .15s, border-color .15s;
+}
+.ow-hero-card[data-role="tank"]    { border-top-color: var(--role-tank); }
+.ow-hero-card[data-role="damage"]  { border-top-color: var(--role-damage); }
+.ow-hero-card[data-role="support"] { border-top-color: var(--role-support); }
+.ow-hero-card img {
+  width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
+  background: var(--ow-panel-hi); display: block; transition: transform .2s;
+}
+.ow-hero-card:hover {
+  transform: translateY(-4px); border-color: var(--ow-orange);
+  box-shadow: 0 8px 20px rgba(0,0,0,.45);
+}
+.ow-hero-card:hover img { transform: scale(1.06); }
+.ow-hero-name { padding: .4rem .3rem; text-align: center; font-weight: 600; font-size: .85rem; color: var(--ow-text); }
+.ow-hero-card:hover .ow-hero-name { color: var(--ow-orange); }
+.ow-role-dot {
+  position: absolute; top: .45rem; right: .45rem; width: .7rem; height: .7rem;
+  border-radius: 50%; border: 1px solid rgba(0,0,0,.45);
+}
+.ow-role-dot[data-role="tank"]    { background: var(--role-tank); }
+.ow-role-dot[data-role="damage"]  { background: var(--role-damage); }
+.ow-role-dot[data-role="support"] { background: var(--role-support); }
+
+/* 역할 배지 */
+.ow-role-badge {
+  display: inline-block; padding: .2rem .75rem; border-radius: var(--ow-radius);
+  font-family: 'Oswald', sans-serif; letter-spacing: .5px; font-size: .8rem; color: #fff;
+}
+.ow-role-badge.role-tank    { background: var(--role-tank); }
+.ow-role-badge.role-damage  { background: var(--role-damage); }
+.ow-role-badge.role-support { background: var(--role-support); color: #16110a; }
+
+/* 영웅 상세 배너 */
+.ow-hero-detail {
+  position: relative; overflow: hidden; margin-bottom: 1.5rem;
+  border: 1px solid var(--ow-border); border-radius: var(--ow-radius);
+  background: linear-gradient(135deg, var(--ow-panel-hi), var(--ow-bg-2));
+}
+.ow-hero-detail.role-tank    { border-left: 5px solid var(--role-tank); }
+.ow-hero-detail.role-damage  { border-left: 5px solid var(--role-damage); }
+.ow-hero-detail.role-support { border-left: 5px solid var(--role-support); }
+.ow-hero-detail-body { padding: 1.5rem; }
+.ow-hero-portrait {
+  width: 130px; height: 130px; object-fit: cover; border-radius: var(--ow-radius);
+  background: var(--ow-panel-hi); border: 1px solid var(--ow-border);
+}
+
+/* 체력/방어구/보호막 칩 */
+.ow-hp { display: flex; gap: .5rem; flex-wrap: wrap; }
+.ow-hp-pill {
+  padding: .25rem .8rem; border-radius: 20px; font-size: .8rem; font-weight: 600;
+  border: 1px solid var(--ow-border); background: rgba(0,0,0,.2);
+}
+.ow-hp-health { color: #7ddb9a; }
+.ow-hp-armor  { color: #f0b86c; }
+.ow-hp-shield { color: #7cc7e8; }
+
+/* 스킬 카드 */
+.ow-ability-card {
+  background: var(--ow-panel); border: 1px solid var(--ow-border);
+  border-radius: var(--ow-radius); padding: 1rem; height: 100%; transition: border-color .15s;
+}
+.ow-ability-card:hover { border-color: var(--ow-orange); }
+.ow-ability-card img { width: 48px; height: 48px; flex-shrink: 0; }
+
+/* ---------- 인게임 스타일 영웅 로스터 ---------- */
+.ow-roster { display: flex; flex-wrap: wrap; gap: 1.75rem; align-items: flex-start; }
+.ow-roster-group { flex: 1 1 300px; min-width: 230px; }
+
+.ow-roster-head {
+  display: flex; align-items: center; gap: .5rem;
+  margin-bottom: .75rem; padding-bottom: .45rem;
+  border-bottom: 2px solid var(--ow-border);
+}
+.ow-roster-head .ow-roster-ico { width: 22px; height: 22px; flex-shrink: 0; }
+.ow-roster-head .ow-roster-label {
+  font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: 1px;
+  font-weight: 600; font-size: 1.05rem; color: var(--ow-text);
+}
+.ow-roster-head .ow-roster-count { font-size: .8rem; color: var(--ow-text-muted); margin-left: auto; }
+.ow-roster-group[data-role="tank"]    .ow-roster-head { border-bottom-color: var(--role-tank); }
+.ow-roster-group[data-role="tank"]    .ow-roster-ico  { color: var(--role-tank); }
+.ow-roster-group[data-role="damage"]  .ow-roster-head { border-bottom-color: var(--role-damage); }
+.ow-roster-group[data-role="damage"]  .ow-roster-ico  { color: var(--role-damage); }
+.ow-roster-group[data-role="support"] .ow-roster-head { border-bottom-color: var(--role-support); }
+.ow-roster-group[data-role="support"] .ow-roster-ico  { color: var(--role-support); }
+
+.ow-roster-grid { display: flex; flex-wrap: wrap; gap: .3rem; }
+
+/* 정사각 초상화 타일 */
+.ow-tile { position: relative; display: block; width: 60px; }
+.ow-tile img {
+  width: 60px; height: 60px; object-fit: cover; display: block;
+  border: 2px solid transparent; border-radius: 2px;
+  background: var(--ow-panel-hi); filter: saturate(.92) brightness(.92);
+  transition: transform .12s, border-color .12s, filter .12s;
+}
+.ow-tile:hover { z-index: 5; }
+.ow-tile:hover img {
+  border-color: var(--ow-orange);
+  transform: scale(1.12);
+  filter: saturate(1.1) brightness(1.08);
+  box-shadow: 0 4px 14px rgba(0,0,0,.55);
+}
+/* 호버 시 이름 말풍선 */
+.ow-tile .ow-tile-name {
+  position: absolute; left: 50%; top: 100%; transform: translateX(-50%);
+  margin-top: 6px; white-space: nowrap;
+  font-size: .72rem; font-weight: 600; color: #16110a;
+  background: var(--ow-orange); padding: 1px 7px; border-radius: 3px;
+  opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 6;
+}
+.ow-tile:hover .ow-tile-name { opacity: 1; }
+
+@media (max-width: 575px) {
+  .ow-tile, .ow-tile img { width: 52px; }
+  .ow-tile img { height: 52px; }
+}
+
+/* ---------- 게임 정보 공통 탭 ---------- */
+.ow-game-tabs {
+  display: flex;
+  gap: .5rem;
+  border-bottom: 2px solid var(--ow-border);
+  padding-bottom: 0;
+  margin-bottom: 1.5rem;
+}
+.ow-game-tab {
+  font-family: 'Oswald', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: .5px;
+  padding: .5rem 1.4rem;
+  color: var(--ow-text-muted);
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+}
+.ow-game-tab:hover { color: var(--ow-text); }
+.ow-game-tab.active {
+  color: var(--ow-orange);
+  border-bottom-color: var(--ow-orange);
+}
