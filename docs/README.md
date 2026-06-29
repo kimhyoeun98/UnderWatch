@@ -30,6 +30,10 @@
 
 * 로그인
 <img width="584" height="571" alt="image" src="https://github.com/user-attachments/assets/f69dac5b-10c4-4249-8ffa-020a230df4f9" />
+
+---
+
+* 마이페이지
 <img width="1365" height="809" alt="image" src="https://github.com/user-attachments/assets/fb1f4ae6-43a7-44f3-9154-94aa2e29ba4a" />
 <img width="1378" height="665" alt="image" src="https://github.com/user-attachments/assets/33ecd874-8bf0-4e40-a7f4-f8825dd9f0ce" />
 
