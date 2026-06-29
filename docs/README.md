@@ -327,7 +327,7 @@ http://underwatch.local:8080
 | --- | --- |
 | [docs/Architecture.md](docs/Architecture.md) | 전체 구조·요청 흐름·단일 컨텍스트·레이어 |
 | [docs/OAuth.md](docs/OAuth.md) | 카카오·네이버·구글 소셜 로그인 구현 |
-| [docs/FaceLogin.md](docs/FaceLogin.md) | LBPH 직접 구현 1:N 얼굴 로그인 |
+| [docs/FaceLogin.md](docs/FaceLogin.md) | LBPH 구현 1:N 얼굴 로그인 |
 | [docs/Database.md](docs/Database.md) | 테이블 스키마·마이그레이션·ERD |
 | [docs/DevelopmentStory.md](docs/DevelopmentStory.md) | 개발하며 겪은 문제와 해결 상세 |
 
