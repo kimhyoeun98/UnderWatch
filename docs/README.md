@@ -49,7 +49,7 @@
 * 게임 정보
 <img width="1359" height="563" alt="image" src="https://github.com/user-attachments/assets/11bd6272-612a-4a6e-b73b-1ca485477cff" />
 <img width="1401" height="744" alt="image" src="https://github.com/user-attachments/assets/7a306397-5016-4e67-aa82-7bce5ec64947" />
-<img width="1359" height="388" alt="image" src="https://github.com/user-attachments/assets/71c0d1ab-16ec-47c7-8e7d-52fad24975eb" />
+<img width="1413" height="517" alt="image" src="https://github.com/user-attachments/assets/95370f48-1688-4253-9e5a-6b047e82939b" />
 
 ---
 
