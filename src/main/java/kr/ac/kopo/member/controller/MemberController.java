@@ -38,7 +38,7 @@ import kr.ac.kopo.member.vo.MemberVO;
 @Controller
 public class MemberController {
 
-	private static final String UPLOAD_DIR = "D:/Serv/ServM/uploads/";
+	private static final String UPLOAD_DIR = "${user.home}/underwatch/uploads";
 
 	@Autowired
 	private MemberService memberService;
