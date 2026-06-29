@@ -3,7 +3,7 @@
 
 > **Spring MVC + Spring Security + MyBatis 기반의 오버워치 커뮤니티 웹 서비스**
 >
-> 게시판, 구인구직, 쪽지, 알림, 게임 정보와 함께 **폼 로그인 · OAuth2 로그인 · 얼굴 인식 로그인**을 하나의 인증 구조로 통합한 프로젝트입니다.
+> 2학년 1학기 서버구축 프로젝트입니다.
 
 ---
 
@@ -23,8 +23,6 @@
 ---
 
 # 📷 프로젝트 화면
-
-> *(스크린샷 추가 예정)*
 
 * 메인 화면
 * 로그인
@@ -64,7 +62,7 @@ Spring Security 기본 로그인
 
 ### ✔ Face Login
 
-* LBPH 알고리즘 구현 
+* LBPH 알고리즘 직접 구현 (외부 라이브러리/모델 없음)
 * 얼굴 특징(히스토그램) 등록
 * 1:N 얼굴 비교
 * 아이디 입력 없이 로그인
@@ -93,11 +91,11 @@ Spring Security 기본 로그인
 
 ## 게임 정보
 
-OverFast API + Blizzard 패치노트 링크 연결
+OverFast API + Blizzard 패치노트 연동
 
 * 영웅 목록 · 역할별 필터 · 스킬 · 체력 · 배경 이야기
 * 맵 목록 (맵 이름 · 게임 모드 한글화)
-* 패치 노트 연결
+* 패치 노트 (공식 패치노트 목록 — 제목 · 날짜 · 원문 링크 · 썸네일)
 
 ---
 
@@ -111,7 +109,7 @@ OverFast API + Blizzard 패치노트 링크 연결
 
 ---
 
-# 핵심 구현
+# ⭐ 핵심 구현
 
 ## 1. 하나의 Principal로 세 가지 로그인 통합
 
@@ -123,7 +121,7 @@ OAuth Login ----> OwUserPrincipal
 Face Login
 ```
 
-세 가지 로그인 모두 동일한 Principal을 사용하도록 설계하여 Controller와 JSP를 수정하지 않고 인증 방식을 확장할 수 있도록 구현했습니다.
+세 가지 로그인 모두 동일한 사용자 정보를 사용하도록 설계하여 Controller와 JSP를 수정하지 않고 인증 방식을 확장할 수 있도록 구현했습니다.
 
 ---
 
@@ -132,7 +130,7 @@ Face Login
 ```
 웹캠 (브라우저에서 이미지 캡처)
 ↓
-Server — LBPH 특징 추출 (직접 구현)
+Server — LBPH 특징 추출 
 ↓
 LBPH 히스토그램
 ↓
@@ -148,11 +146,11 @@ LBPH 히스토그램
 
 ## 3. 게임 정보 API
 
-오버워치 **영웅·맵** 정보는 OverFast API로, **패치 노트**는 Blizzard 공식 패치노트 페이지에서 가져와 제공합니다.
+오버워치 **영웅·맵** 정보는 OverFast API로, **패치 노트**는 Blizzard 공식 패치노트 페이지를 링크합니다.
 
 * 영웅: 목록(역할별) · 상세 — 한국어(`locale=ko-kr`)
 * 맵: 목록 — 맵 이름 · 게임 모드 한글 보강
-* 패치 노트: **원문 링크** · 썸네일 제공
+* 패치 노트: **원문 링크** 
 
 ---
 
@@ -168,13 +166,12 @@ LBPH 히스토그램
 
 * `CommonsMultipartResolver` 제거 → `StandardServletMultipartResolver`로 교체
 * `@RequestParam` 이름 생략 시 깨짐 → 컴파일러 `-parameters` 옵션 필요
-* `@AuthenticationPrincipal` 미동작 → 인자 리졸버(`AuthenticationPrincipalArgumentResolver`) 수동 등록
 * JSP `sec:authorize` 동작 안 함 → 표현식 핸들러 빈 명시적 노출
 * 파일 다운로드 깨짐 → `ResourceHttpMessageConverter` 관련 설정
 
 ➡ **레퍼런스의 버전 차이를 의심하는 습관**이 생겼습니다.
 
-## 2. Oracle 한글 인코딩 — 가장 끈질겼던 적
+## 2. Oracle 한글 인코딩 
 
 체감상 DB 쪽이 제일 자주 터졌습니다.
 
@@ -233,7 +230,7 @@ LBPH 히스토그램
 | Build            | Maven             |
 | Server           | Tomcat 11         |
 | External API     | OverFast API · Blizzard 패치노트 |
-| Face Recognition | LBPH              |
+| Face Recognition | LBPH (직접 구현)   |
 
 ---
 
@@ -339,12 +336,11 @@ http://underwatch.local:8080
 # 🔧 향후 개선 사항
 
 * HTTPS 적용
-* WebAuthn 적용 (얼굴 인식 로그인)
+* WebAuthn 적용
 * 얼굴 라이브니스 검출
 * OAuth Secret 관리 개선
 * API 캐싱 적용
 * Redis 기반 알림 기능 개선
-* 패치노트 게시판 화
 
 ---
 
