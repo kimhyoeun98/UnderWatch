@@ -1,5 +1,6 @@
 package kr.ac.kopo.member.service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -7,7 +8,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import kr.ac.kopo.member.dao.MemberDAO;
-import kr.ac.kopo.member.face.LbphFaceRecognizer;
+import kr.ac.kopo.member.face.EigenFaceRecognizer;
 import kr.ac.kopo.member.vo.MemberVO;
 
 @Service
@@ -88,21 +89,18 @@ public class MemberServiceImpl implements MemberService {
 		memberDAO.updateNicknameChanged(id);
 	}
 
-	// ===== M-09 얼굴 로그인 (LBPH 직접 구현) =====
-
-	/** 같은 사람으로 인정하는 최대 거리(카이제곱, 0~2). 낮을수록 엄격 — 환경에 맞게 조정. */
-	private static final double MATCH_THRESHOLD = 0.45;
+	// ===== M-09 얼굴 로그인 (Eigenfaces/PCA) =====
 
 	@Autowired
-	private LbphFaceRecognizer faceRecognizer;
+	private EigenFaceRecognizer faceRecognizer;
 
 	@Override
 	public boolean saveFace(String id, String imageData) {
-		int[] feature = faceRecognizer.extract(imageData);
-		if (feature == null) {
+		int[] face = faceRecognizer.extractFace(imageData);
+		if (face == null) {
 			return false; // 이미지 디코드/추출 실패
 		}
-		memberDAO.updateFaceDescriptor(id, faceRecognizer.toJson(feature));
+		memberDAO.updateFaceDescriptor(id, faceRecognizer.toJson(face));
 		return true;
 	}
 
@@ -113,22 +111,20 @@ public class MemberServiceImpl implements MemberService {
 
 	@Override
 	public String matchFace(String imageData) {
-		int[] probe = faceRecognizer.extract(imageData);
+		int[] probe = faceRecognizer.extractFace(imageData);
 		if (probe == null) {
 			return null;
 		}
-		String bestId = null;
-		double bestDist = Double.MAX_VALUE;
+		// 등록된 얼굴들을 모아 PCA 고유공간에서 1:N 비교 (recognize 내부에서 최근접 거리 로그)
+		List<String> ids = new ArrayList<>();
+		List<int[]> faces = new ArrayList<>();
 		for (MemberVO m : memberDAO.selectAllFaces()) {
-			int[] stored = faceRecognizer.parse(m.getFaceDescriptor());
-			double dist = faceRecognizer.distance(probe, stored);
-			if (dist < bestDist) {
-				bestDist = dist;
-				bestId = m.getId();
+			int[] f = faceRecognizer.parse(m.getFaceDescriptor());
+			if (f != null && f.length == EigenFaceRecognizer.DIM) {   // 옛 형식(LBPH 등) 데이터는 건너뜀
+				ids.add(m.getId());
+				faces.add(f);
 			}
 		}
-		// 임계값 조정에 참고할 수 있도록 최근접 거리를 로그로 남긴다
-		System.out.println("[FaceLogin] best=" + bestId + " dist=" + bestDist);
-		return bestDist <= MATCH_THRESHOLD ? bestId : null;
+		return faceRecognizer.recognize(probe, ids, faces);
 	}
 }

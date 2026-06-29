@@ -4,7 +4,6 @@
 > **Spring MVC + Spring Security + MyBatis 기반의 오버워치 커뮤니티 웹 서비스**
 >
 > 2학년 1학기 서버구축 프로젝트입니다.
-
 ---
 
 # 📌 프로젝트 소개
@@ -23,6 +22,7 @@
 ---
 
 # 📷 프로젝트 화면
+
 * 메인 화면
 <img width="1327" height="931" alt="image" src="https://github.com/user-attachments/assets/50e4a9ac-beed-4926-b30c-2fa8419bbc71" />
 
@@ -49,7 +49,7 @@
 * 게임 정보
 <img width="1359" height="563" alt="image" src="https://github.com/user-attachments/assets/11bd6272-612a-4a6e-b73b-1ca485477cff" />
 <img width="1401" height="744" alt="image" src="https://github.com/user-attachments/assets/7a306397-5016-4e67-aa82-7bce5ec64947" />
-<img width="1359" height="388" alt="image" src="https://github.com/user-attachments/assets/71c0d1ab-16ec-47c7-8e7d-52fad24975eb" />
+<img width="1413" height="517" alt="image" src="https://github.com/user-attachments/assets/95370f48-1688-4253-9e5a-6b047e82939b" />
 
 ---
 
@@ -97,7 +97,7 @@ Spring Security 기본 로그인
 
 ### ✔ Face Login
 
-* LBPH 알고리즘 직접 구현 (외부 라이브러리/모델 없음)
+* Eigenfaces(PCA) 알고리즘 구현
 * 얼굴 특징(히스토그램) 등록
 * 1:N 얼굴 비교
 * 아이디 입력 없이 로그인
@@ -156,7 +156,7 @@ OAuth Login ----> OwUserPrincipal
 Face Login
 ```
 
-세 가지 로그인 모두 동일한 사용자 정보를 사용하도록 설계하여 Controller와 JSP를 수정하지 않고 인증 방식을 확장할 수 있도록 구현했습니다.
+세 가지 로그인 모두 동일한 Principal을 사용하도록 설계하여 Controller와 JSP를 수정하지 않고 인증 방식을 확장할 수 있도록 구현했습니다.
 
 ---
 
@@ -165,11 +165,11 @@ Face Login
 ```
 웹캠 (브라우저에서 이미지 캡처)
 ↓
-Server — LBPH 특징 추출 
+Server — 얼굴 정규화 (64×64)
 ↓
-LBPH 히스토그램
+PCA 학습 (평균·고유얼굴 공간) 
 ↓
-1:N 비교 (카이제곱 거리)
+고유공간 투영 후 1:N 최근접 비교
 ↓
 로그인
 ```
@@ -181,11 +181,11 @@ LBPH 히스토그램
 
 ## 3. 게임 정보 API
 
-오버워치 **영웅·맵** 정보는 OverFast API로, **패치 노트**는 Blizzard 공식 패치노트 페이지를 링크합니다.
+오버워치 **영웅·맵** 정보는 OverFast API로, **패치 노트**는 Blizzard 공식 패치노트 페이지에서 가져와 제공합니다.
 
 * 영웅: 목록(역할별) · 상세 — 한국어(`locale=ko-kr`)
 * 맵: 목록 — 맵 이름 · 게임 모드 한글 보강
-* 패치 노트: **원문 링크** 
+* 패치 노트: 공식 페이지를 파싱해 제목 · 날짜 · **원문 링크** · 썸네일 제공
 
 ---
 
@@ -201,12 +201,13 @@ LBPH 히스토그램
 
 * `CommonsMultipartResolver` 제거 → `StandardServletMultipartResolver`로 교체
 * `@RequestParam` 이름 생략 시 깨짐 → 컴파일러 `-parameters` 옵션 필요
+* `@AuthenticationPrincipal` 미동작 → 인자 리졸버(`AuthenticationPrincipalArgumentResolver`) 수동 등록
 * JSP `sec:authorize` 동작 안 함 → 표현식 핸들러 빈 명시적 노출
 * 파일 다운로드 깨짐 → `ResourceHttpMessageConverter` 관련 설정
 
 ➡ **레퍼런스의 버전 차이를 의심하는 습관**이 생겼습니다.
 
-## 2. Oracle 한글 인코딩 
+## 2. Oracle 한글 인코딩
 
 체감상 DB 쪽이 제일 자주 터졌습니다.
 
@@ -265,7 +266,7 @@ LBPH 히스토그램
 | Build            | Maven             |
 | Server           | Tomcat 11         |
 | External API     | OverFast API · Blizzard 패치노트 |
-| Face Recognition | LBPH (직접 구현)   |
+| Face Recognition | Eigenfaces/PCA  |
 
 ---
 
@@ -362,7 +363,7 @@ http://underwatch.local:8080
 | --- | --- |
 | [docs/Architecture.md](docs/Architecture.md) | 전체 구조·요청 흐름·단일 컨텍스트·레이어 |
 | [docs/OAuth.md](docs/OAuth.md) | 카카오·네이버·구글 소셜 로그인 구현 |
-| [docs/FaceLogin.md](docs/FaceLogin.md) | LBPH 구현 1:N 얼굴 로그인 |
+| [docs/FaceLogin.md](docs/FaceLogin.md) | Eigenfaces(PCA) 1:N 얼굴 로그인 |
 | [docs/Database.md](docs/Database.md) | 테이블 스키마·마이그레이션·ERD |
 | [docs/DevelopmentStory.md](docs/DevelopmentStory.md) | 개발하며 겪은 문제와 해결 상세 |
 
@@ -381,5 +382,5 @@ http://underwatch.local:8080
 
 # 👨‍💻 개발자
 
-한국폴리텍대학 AI소프트웨어과 김효은
+한국폴리텍대학 AI소프트웨어과
 Backend Developer Portfolio Project

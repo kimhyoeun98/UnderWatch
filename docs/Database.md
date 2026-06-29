@@ -1,4 +1,4 @@
-# Database 
+# Database
 
 Oracle XE 기반 데이터베이스 구조 문서입니다.
 모든 테이블 접두사는 `ow_`입니다.
@@ -61,7 +61,7 @@ ow_visit_daily
 | `status`          | 회원 상태         |
 | `provider`        | 소셜 제공자        |
 | `provider_id`     | 소셜 고유 ID      |
-| `face_descriptor` | 얼굴 특징(LBPH 히스토그램) JSON |
+| `face_descriptor` | 얼굴 특징(PCA용 정규화 벡터) JSON |
 
 ---
 

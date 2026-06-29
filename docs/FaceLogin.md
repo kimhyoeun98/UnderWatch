@@ -1,6 +1,8 @@
-# 얼굴 인식 로그인 
+# 얼굴 인식 로그인
 
-**LBPH(Local Binary Patterns Histogram)** 알고리즘을 사용하여 구현한 1:N 얼굴 로그인 문서입니다.
+**Eigenfaces(PCA, 주성분 분석)** 를 구현한 1:N 얼굴 로그인 문서입니다. 외부 라이브러리·학습모델 없이, 등록된 얼굴들로부터 "고유얼굴 공간"을 학습해 인식합니다.
+
+> 같은 파이프라인의 LBPH 버전(`LbphFaceRecognizer`)도 대체 구현으로 보유하고 있습니다(11장 참고).
 
 ---
 
@@ -9,28 +11,29 @@
 ```text
 [등록]
 마이페이지 → 웹캠 프레임 캡처(브라우저) → base64 이미지 전송
-        → 서버 LBPH 특징 추출 → DB 저장
+        → 서버에서 정규화 얼굴 벡터 추출 → DB 저장
 
 [로그인]
 로그인 화면 → 웹캠 프레임 캡처 → base64 이미지 전송
-        → 서버 LBPH 특징 추출 → 1:N 비교 → 세션 로그인
+        → 서버에서 등록 얼굴들로 PCA 학습 → 고유공간 1:N 비교 → 세션 로그인
 ```
 
-브라우저는 **이미지만** 보내고, 얼굴 특징 추출과 비교는 전부 서버(Java)에서 합니다.
+브라우저는 **이미지만** 보내고, 특징 추출·학습·비교는 전부 서버(Java)에서 합니다.
 
 ---
 
 ## 2. 구성 요소
 
-| 위치                              | 역할                              |
-| ------------------------------- | ------------------------------- |
-| `add_face.sql`                  | `face_descriptor`(CLOB) 컬럼 추가   |
-| `LbphFaceRecognizer`            | **LBPH** (특징 추출 + 거리 비교)  |
-| `MemberServiceImpl`             | 얼굴 등록 저장 / 1:N 매칭               |
-| `MemberController`              | 얼굴 등록 / 얼굴 로그인 요청 처리           |
-| `faceLogin.jsp`                 | 얼굴 로그인 화면 (웹캠 캡처)              |
-| `mypage.jsp`                    | 얼굴 등록 UI (웹캠 캡처)               |
-| `spring-security.xml`           | 얼굴 로그인 URL 접근 권한 설정            |
+| 위치                   | 역할                                  |
+| -------------------- | ----------------------------------- |
+| `add_face.sql`       | `face_descriptor`(CLOB) 컬럼 추가       |
+| `EigenFaceRecognizer`| **PCA 구현** (정규화·학습·투영·비교)    |
+| `LbphFaceRecognizer` | LBPH 대체 구현(미사용, fallback)            |
+| `MemberServiceImpl`  | 얼굴 등록 저장 / 1:N 매칭                    |
+| `MemberController`   | 얼굴 등록 / 얼굴 로그인 요청 처리                |
+| `faceLogin.jsp`      | 얼굴 로그인 화면 (웹캠 캡처)                   |
+| `mypage.jsp`         | 얼굴 등록 UI (웹캠 캡처)                    |
+| `spring-security.xml`| 얼굴 로그인 URL 접근 권한 설정                 |
 
 ---
 
@@ -51,49 +54,44 @@ function captureSquare(size) {
 
 ---
 
-## 4. 서버 — LBPH 특징 추출 (`LbphFaceRecognizer`)
+## 4. 서버 — 얼굴 정규화 (`EigenFaceRecognizer.extractFace`)
 
 JDK(`ImageIO`, `AWT`)로 처리합니다.
 
 1. base64 이미지 디코드 → `BufferedImage`
-2. 흑백 변환 + 128×128 리사이즈
+2. 흑백 변환 + **64×64 리사이즈** → 4096차원
 3. 히스토그램 평활화(조명 보정)
-4. **LBP 코드**: 각 픽셀의 3×3 이웃 8개를 중심값과 비교(크거나 같으면 1) → 8비트 코드(0~255)
-5. 이미지를 8×8 셀로 나눠 셀별 256-bin 히스토그램을 이어붙임 → 길이 16384 특징 벡터
+4. 0~255 명도 벡터(`int[4096]`)를 JSON으로 `face_descriptor`(CLOB)에 저장
 
-```java
-int code = 0;
-code |= (gray[y-1][x-1] >= c ? 1 : 0) << 7;
-code |= (gray[y-1][x]   >= c ? 1 : 0) << 6;
-// ... 8개 이웃 ...
-hist[cell * 256 + code]++;
-```
-
-추출한 히스토그램은 JSON 문자열로 `face_descriptor`(CLOB)에 저장합니다.
+이 정규화 벡터가 PCA의 입력(등록 얼굴)이 됩니다.
 
 ---
 
-## 5. 서버 — 1:N 매칭
+## 5. 서버 — PCA 학습 + 인식 (`recognize`)
 
-등록된 모든 얼굴과 **카이제곱 거리**로 비교해 가장 가까운 회원을 찾고, 임계값 이내일 때만 로그인합니다.
+로그인 시, **등록된 얼굴들로 그 자리에서 고유얼굴 공간을 학습**한 뒤 입력 얼굴을 그 공간에서 비교합니다.
+
+**학습 단계**
+1. 모든 등록 얼굴의 **평균 얼굴** 계산 → 각 얼굴을 평균에서 빼서 **중심화**(행렬 A)
+2. 차원이 커서(4096) 공분산 `AᵀA`(4096×4096) 대신 **소표본 트릭** 사용 — `L = AAᵀ`(M×M, M=등록 인원)의 고유분해
+3. `L`의 고유분해는 **Jacobi 회전법을 직접 구현**해서 계산 → 상위 고유벡터로 **고유얼굴**을 만든다(`고유얼굴 = A·v`, 정규화)
+
+**인식 단계**
+4. 입력 얼굴과 등록 얼굴들을 상위 K개 고유얼굴 공간에 **투영**(가중치 벡터)
+5. 입력의 가중치와 가장 가까운(유클리드) 등록 얼굴 선택 → 임계값 이내면 로그인
 
 ```java
-private static final double MATCH_THRESHOLD = 0.45;   // 카이제곱(0~2), 낮을수록 엄격
+public static final double MATCH_THRESHOLD = 3.5;  // 고유공간 거리, 환경에 맞게 조정
 
-public String matchFace(String imageData) {
-    int[] probe = faceRecognizer.extract(imageData);
-    String bestId = null;
-    double bestDist = Double.MAX_VALUE;
-    for (MemberVO m : memberDAO.selectAllFaces()) {
-        double dist = faceRecognizer.distance(probe, faceRecognizer.parse(m.getFaceDescriptor()));
-        if (dist < bestDist) { bestDist = dist; bestId = m.getId(); }
-    }
-    return bestDist <= MATCH_THRESHOLD ? bestId : null;
+public String recognize(int[] probe, List<String> ids, List<int[]> gallery) {
+    // 평균/중심화 → L=AAᵀ → jacobi(L) → 고유얼굴 → 투영 → 최근접
+    ...
+    return bestDist <= MATCH_THRESHOLD ? bestId : null;  // dist는 콘솔 로그
 }
 ```
 
-* 거리 = 두 히스토그램을 확률분포로 정규화한 뒤 카이제곱(`Σ (a-b)²/(a+b)`)
-* `matchFace`는 최근접 거리를 콘솔에 로그로 남기므로, 그 값을 보고 `MATCH_THRESHOLD`를 환경에 맞게 조정하면 됩니다.
+* 등록 인원이 늘면 **고유얼굴 공간을 다시 학습**합니다(매칭 때 자동 재계산).
+* `recognize`는 최근접 거리를 콘솔(`[FaceLogin/PCA] dist=...`)에 남기므로, 그 값을 보고 같은 사람/다른 사람 사이로 `MATCH_THRESHOLD`를 조정하면 됩니다.
 
 ---
 
@@ -115,11 +113,11 @@ request.getSession(true).setAttribute(
 
 ## 7. 엔드포인트
 
-| 메서드  | URL                      | 권한        | 파라미터          | 설명             |
-| ---- | ------------------------ | --------- | ------------- | -------------- |
-| GET  | `/member/face/login`     | permitAll | -             | 얼굴 로그인 화면      |
-| POST | `/member/face/loginProc` | permitAll | `image`       | 얼굴 매칭 후 로그인    |
-| POST | `/member/face/register`  | 인증 필요     | `image`       | 본인 얼굴 등록       |
+| 메서드  | URL                      | 권한        | 파라미터  | 설명          |
+| ---- | ------------------------ | --------- | ----- | ----------- |
+| GET  | `/member/face/login`     | permitAll | -     | 얼굴 로그인 화면   |
+| POST | `/member/face/loginProc` | permitAll | `image` | 얼굴 매칭 후 로그인 |
+| POST | `/member/face/register`  | 인증 필요     | `image` | 본인 얼굴 등록    |
 
 ---
 
@@ -138,17 +136,28 @@ request.getSession(true).setAttribute(
 
 ## 9. 한계
 
-LBPH는 직접 구현이 쉽고 학습이 필요 없는 대신, 딥러닝 방식보다 정확도가 낮습니다.
+Eigenfaces(PCA)는 구현·학습이 명확한 대신, 딥러닝 방식보다 정확도가 낮습니다.
 
 * 얼굴 정렬(가이드 박스에 맞추기)에 의존 — 각도/표정/조명 변화에 민감
 * 사진 스푸핑 가능, 라이브니스 검출 없음
-* 등록자가 많아질수록 오인식 가능성 증가
+* 한 사람당 1장 등록이면 인식력이 약함(여러 장일수록 좋음)
+* 새 회원이 등록될 때마다 고유공간을 다시 학습해야 함
 
 ---
 
-## 10. LBPH 사용 이유
+## 10. PCA(Eigenfaces) 선정 이유
 
-* PCA/LDA는 픽셀 명암값 자체를 다뤄 조명에 취약, LBPH는 이웃 픽셀보다 밝은가/어두운가 에 상대 비교만 합니다.
-* PCA/LDA는 전체 회원 얼굴로 벡터를 만들기 때문에 새 사용자가 등록될 때 마다 모델 전체를 다시 계산해야함, LBPH는 각 얼굴을 독립적으로 히스토그램화하므로 그 사람 것만 저장하면 됩니다. 
-* Fisherfaces(LDA)는 한 사람당 사진 2장 이상이 있어야 동작함(클래스 내 분산 계산 필요), LBPH는 1장이면 등록, 인식 가능합니다.
+* **"모델을 직접 학습시킨다"는 과정이 분명함** — 등록 얼굴들로 평균 얼굴 + 고유얼굴(주성분) 공간을 계산하는 학습 단계가 코드에 그대로 드러남
+* **외부 모델/라이브러리 없이 구현** — 핵심인 고유분해(Jacobi)까지 손으로 작성 → "가져온 게 아니라 만든 것"
 
+---
+
+## 11. 대체 구현 — LBPH
+
+`LbphFaceRecognizer`로 LBPH(Local Binary Patterns Histogram)도 직접 구현되어 있습니다(현재 미사용). PCA와 달리 학습이 필요 없고 조명에 강하며 1장 등록에 유리하지만, "모델 학습" 과정이 드러나지 않습니다. `MemberServiceImpl`의 주입 타입만 바꾸면 즉시 전환됩니다.
+
+---
+
+## 12. 기존 등록 데이터 주의
+
+이전(LBPH/face-api) 방식으로 저장된 `face_descriptor`는 PCA 형식(64×64=4096 길이)과 다릅니다. `parse()`가 형식이 맞지 않으면 해당 얼굴을 건너뛰므로 오류는 없지만, 해당 회원은 **얼굴을 다시 등록**해야 합니다.

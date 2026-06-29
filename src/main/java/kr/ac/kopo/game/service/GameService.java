@@ -15,7 +15,6 @@ import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
@@ -191,151 +190,57 @@ public class GameService {
 		}
 	}
 
-	/** 디버그용 — 실제로 어떤 응답이 오는지 확인 */
-	public String getPatchesDebug() {
-		StringBuilder sb = new StringBuilder();
-		try {
-			org.jsoup.Connection.Response resp = Jsoup.connect("https://overwatch.blizzard.com/ko-kr/news/patch-notes/")
-					.userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36")
-					.header("Accept", "text/html,application/xhtml+xml")
-					.header("Accept-Language", "ko-KR,ko;q=0.9")
-					.timeout(15000)
-					.ignoreHttpErrors(true)
-					.execute();
-
-			sb.append("=== HTTP 상태: ").append(resp.statusCode()).append(" ").append(resp.statusMessage()).append("\n\n");
-
-			Document doc = resp.parse();
-			Element nextDataEl = doc.getElementById("__NEXT_DATA__");
-
-			if (nextDataEl == null) {
-				sb.append("=== __NEXT_DATA__ 없음 ===\n");
-				sb.append("--- body 첫 2000자 ---\n");
-				sb.append(doc.body() != null ? doc.body().html().substring(0, Math.min(2000, doc.body().html().length())) : "(empty)");
-			} else {
-				String json = nextDataEl.html();
-				sb.append("=== __NEXT_DATA__ 발견! 길이=").append(json.length()).append(" ===\n");
-				// props.pageProps 의 최상위 키 목록
-				try {
-					JsonNode root = mapper.readTree(json);
-					JsonNode pageProps = root.path("props").path("pageProps");
-					sb.append("pageProps 키 목록: ");
-					pageProps.fieldNames().forEachRemaining(k -> sb.append(k).append(", "));
-					sb.append("\n\n");
-					sb.append("JSON 앞 3000자:\n").append(json, 0, Math.min(3000, json.length()));
-				} catch (Exception e2) {
-					sb.append("JSON 파싱 실패: ").append(e2.getMessage()).append("\n");
-					sb.append("원본 앞 2000자:\n").append(json, 0, Math.min(2000, json.length()));
-				}
-			}
-		} catch (Exception e) {
-			sb.append("예외 발생: ").append(e.getClass().getName()).append(": ").append(e.getMessage());
-		}
-		return sb.toString();
-	}
-
 	/**
-	 * 공식 패치 노트 목록 — Blizzard 패치노트 페이지의 __NEXT_DATA__ JSON을 파싱.
+	 * 공식 패치 노트 목록 — Blizzard 패치노트 페이지에서 패치 제목(h3.PatchNotes-patchTitle)을 파싱한다.
+	 * 페이지가 단일 문서(최신 패치 본문 + 날짜별 제목) 구조라, 링크는 공식 패치노트 페이지로 연결한다.
+	 * (예전 __NEXT_DATA__ JSON 구조는 Blizzard 페이지 개편으로 더 이상 존재하지 않는다.)
 	 * 반환 필드: title, date, url, thumbnail
 	 */
 	public List<Map<String, Object>> getPatches() {
+		final String base = "https://overwatch.blizzard.com/ko-kr/news/patch-notes/";
 		try {
-			Document doc = Jsoup.connect("https://overwatch.blizzard.com/ko-kr/news/patch-notes/")
-					.userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+			Document doc = Jsoup.connect(base)
+					.userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+					.header("Accept-Language", "ko-KR,ko;q=0.9")
 					.timeout(12000)
 					.get();
 
-			Element nextDataEl = doc.getElementById("__NEXT_DATA__");
-			if (nextDataEl == null) return new ArrayList<>();
-
-			JsonNode root    = mapper.readTree(nextDataEl.html());
-			JsonNode patches = findPatchArray(root);
-			if (patches == null || !patches.isArray()) return new ArrayList<>();
-
 			List<Map<String, Object>> result = new ArrayList<>();
-			for (JsonNode p : patches) {
+			// 패치 블록마다 제목/날짜/앵커가 함께 들어있다. 블록 단위로 묶어야 서로 어긋나지 않는다.
+			for (Element block : doc.select(".PatchNotes-patch")) {
+				Element titleEl = block.selectFirst("h3.PatchNotes-patchTitle");
+				if (titleEl == null) {
+					continue;
+				}
+				String full = titleEl.text().trim();
+				if (full.isEmpty()) {
+					continue;
+				}
+				// 제목 끝의 날짜(적용일)는 떼어내고, 표시 날짜는 블록의 게시일(.PatchNotes-date)을 쓴다 — 앵커 날짜와 일치
+				String title = full.split(" - ", 2)[0].trim();
+
+				Element dateEl = block.selectFirst(".PatchNotes-date");
+				String date = (dateEl != null && !dateEl.text().isBlank())
+						? dateEl.text().trim()
+						: (full.contains(" - ") ? full.split(" - ", 2)[1].trim() : "");
+
+				// 개별 패치로 바로 가는 딥링크 (#patch-YYYY-MM-DD)
+				Element anchor = block.selectFirst(".anchor[id]");
+				String url = (anchor != null && !anchor.id().isEmpty())
+						? base + "#" + anchor.id()
+						: base;
+
 				Map<String, Object> m = new LinkedHashMap<>();
-				m.put("title",     text(p, "title", "patch_title", "header"));
-				m.put("date",      text(p, "publish_date", "date", "patch_date", "published_at"));
-				m.put("url",       patchUrl(p));
-				m.put("thumbnail", thumb(p));
+				m.put("title", title);
+				m.put("date", date);
+				m.put("url", url);
+				m.put("thumbnail", "");   // 페이지에서 패치별 썸네일을 제공하지 않음
 				result.add(m);
 			}
 			return result;
 		} catch (Exception e) {
 			return new ArrayList<>();
 		}
-	}
-
-	/** __NEXT_DATA__ 트리에서 패치 배열을 탐색 — Blizzard 구조 변경에 대비해 여러 경로 시도 */
-	private JsonNode findPatchArray(JsonNode root) {
-		// 시도할 경로 목록
-		String[][] paths = {
-			{"props", "pageProps", "patchData"},
-			{"props", "pageProps", "blizzardNewsData", "news"},
-			{"props", "pageProps", "articleList"},
-			{"props", "pageProps", "articles"},
-			{"props", "pageProps", "news"},
-			{"props", "pageProps", "data", "articles"},
-			{"props", "pageProps", "initialState", "patches"},
-		};
-		for (String[] path : paths) {
-			JsonNode node = root;
-			for (String key : path) node = node == null ? null : node.path(key);
-			if (node != null && !node.isMissingNode() && node.isArray() && node.size() > 0) {
-				return node;
-			}
-		}
-		// 못 찾으면 트리 전체를 BFS로 탐색해서 배열 중 title 필드를 가진 것을 반환
-		return searchForPatchArray(root, 0);
-	}
-
-	private JsonNode searchForPatchArray(JsonNode node, int depth) {
-		if (depth > 6 || node == null) return null;
-		if (node.isArray() && node.size() > 0) {
-			JsonNode first = node.get(0);
-			if (first != null && (first.has("title") || first.has("patch_title") || first.has("slug"))) {
-				return node;
-			}
-		}
-		if (node.isObject()) {
-			for (JsonNode child : node) {
-				JsonNode found = searchForPatchArray(child, depth + 1);
-				if (found != null) return found;
-			}
-		}
-		return null;
-	}
-
-	private String text(JsonNode n, String... keys) {
-		for (String k : keys) {
-			JsonNode v = n.path(k);
-			if (!v.isMissingNode() && !v.isNull() && v.isTextual()) return v.asText();
-		}
-		return "";
-	}
-
-	private String patchUrl(JsonNode p) {
-		// blizzard_url, url, link, slug 순서로 시도
-		for (String k : new String[]{"blizzard_url", "url", "link"}) {
-			String v = text(p, k);
-			if (!v.isEmpty()) return v;
-		}
-		String slug = text(p, "slug", "id");
-		if (!slug.isEmpty()) {
-			return "https://overwatch.blizzard.com/ko-kr/news/patch-notes/" + slug + "/";
-		}
-		return "https://overwatch.blizzard.com/ko-kr/news/patch-notes/";
-	}
-
-	private String thumb(JsonNode p) {
-		JsonNode t = p.path("thumbnail");
-		if (!t.isMissingNode()) {
-			if (t.isTextual()) return t.asText();
-			String url = text(t, "url", "src", "uri");
-			if (!url.isEmpty()) return url;
-		}
-		return text(p, "image", "thumbnail_url", "cover_image");
 	}
 
 	private String krName(Object key, Object fallback) {

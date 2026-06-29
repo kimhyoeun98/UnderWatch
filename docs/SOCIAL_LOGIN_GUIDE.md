@@ -1,4 +1,4 @@
-# UnderWatch 소셜 로그인(M-03) 설정 가이드 
+# UnderWatch 소셜 로그인(M-03) 설정 가이드
 
 카카오 / 네이버 / 구글 OAuth2 로그인을 붙이는 방법입니다.
 (Spring Security 6.4 OAuth2 Client, 순수 XML MVC 기준)
