@@ -12,21 +12,15 @@ import javax.imageio.ImageIO;
 
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-
 /**
- * M-09 얼굴 인식 — Eigenfaces(PCA) 구현.
+ * M-09 얼굴 인식 — Eigenfaces(PCA) 직접 구현 (모델 영속화 버전).
  *
- * 외부 라이브러리/학습모델 없이 순수 JDK 만으로, 등록된 얼굴들로부터
- * "고유얼굴(주성분) 공간을 직접 학습"하고 그 공간에서 얼굴을 비교한다.
+ * 외부 라이브러리/학습모델 없이 순수 JDK 만으로:
+ *   1) [학습 1회] 초기 등록 얼굴들로 평균 얼굴 + 고유얼굴(주성분) 공간을 만든다(buildModel).
+ *   2) [등록]    이후 새 얼굴은 "기존 고유공간에 투영"만 해서 가중치 벡터를 얻는다(project).
+ *   3) [인식]    입력 얼굴을 투영한 뒤, 저장된 회원 벡터들과 최근접(유클리드) 비교한다.
  *
- * 처리 과정:
- *   1) base64 이미지 → 흑백 → {@value #SIZE}x{@value #SIZE} 리사이즈 → 히스토그램 평활화 (얼굴 벡터)
- *   2) [학습] 등록 얼굴들의 평균 얼굴 계산 → 중심화
- *   3) [학습] 소표본 PCA: L = AᵀA(M×M)의 고유분해(Jacobi) → 고유얼굴 = A·v
- *   4) [인식] 입력 얼굴과 등록 얼굴들을 고유얼굴 공간에 투영 → 최근접(유클리드) 회원 선택
- *
- * 딥러닝이 아닌 고전 통계 기법이며, 저장값은 정규화 얼굴 벡터(int[]) 자체다.
+ * 핵심인 고유분해(Jacobi 회전법)까지 직접 구현했다. 딥러닝이 아닌 고전 통계 기법이다.
  */
 @Component
 public class EigenFaceRecognizer {
@@ -38,87 +32,89 @@ public class EigenFaceRecognizer {
 	public static final int MAX_COMPONENTS = 10;
 
 	/**
-	 * 같은 사람으로 인정하는 최대 거리(고유얼굴 공간, 유클리드). 환경/조명에 따라 달라지므로
-	 * matchFace 호출 시 콘솔에 찍히는 dist 값을 보고 "같은 사람"과 "다른 사람" 사이로 조정한다.
+	 * 같은 사람으로 인정하는 최대 거리(고유공간, 유클리드). 환경/조명에 따라 달라지므로
+	 * 로그인 시 콘솔에 찍히는 dist 값을 보고 "같은 사람"과 "다른 사람" 사이로 조정한다.
 	 */
 	public static final double MATCH_THRESHOLD = 3.5;
-	/** 등록 얼굴이 1장뿐일 때 쓰는 직접 비교(정규화 픽셀) 임계값 */
-	public static final double SINGLE_THRESHOLD = 9.0;
 
-	private final ObjectMapper mapper = new ObjectMapper();
+	/** 학습된 PCA 모델: 평균 얼굴 + 고유얼굴(정규화 K개) */
+	public static class Model {
+		public final double[] mean;        // 길이 DIM
+		public final double[][] eigenfaces; // K x DIM
+		public Model(double[] mean, double[][] eigenfaces) {
+			this.mean = mean;
+			this.eigenfaces = eigenfaces;
+		}
+		public boolean valid() {
+			return mean != null && mean.length == DIM && eigenfaces != null && eigenfaces.length > 0;
+		}
+	}
 
-	/** 이미지(data URL/base64) → 정규화 얼굴 벡터(int[DIM], 0~255). 저장용. */
+	// ===== 이미지 → 정규화 얼굴 벡터 =====
+
+	/** data URL/base64 문자열 → 정규화 얼굴 벡터(int[DIM], 0~255). 디코드 실패 시 null */
 	public int[] extractFace(String imageData) {
-		BufferedImage img = decode(imageData);
-		if (img == null) {
+		try {
+			String base64 = imageData.contains(",")
+					? imageData.substring(imageData.indexOf(',') + 1)
+					: imageData;
+			return extractFaceFromBytes(Base64.getDecoder().decode(base64.trim()));
+		} catch (Exception e) {
 			return null;
 		}
-		int[][] gray = toGrayResized(img, SIZE, SIZE);
-		equalize(gray, SIZE, SIZE);
-		int[] v = new int[DIM];
-		for (int y = 0; y < SIZE; y++) {
-			for (int x = 0; x < SIZE; x++) {
-				v[y * SIZE + x] = gray[y][x];
+	}
+
+	/** 이미지 바이트(jpg/png) → 정규화 얼굴 벡터(int[DIM]). 디코드 실패 시 null */
+	public int[] extractFaceFromBytes(byte[] bytes) {
+		if (bytes == null) {
+			return null;
+		}
+		try {
+			BufferedImage img = ImageIO.read(new ByteArrayInputStream(bytes));
+			if (img == null) {
+				return null;
 			}
-		}
-		return v;
-	}
-
-	public String toJson(int[] v) {
-		try {
-			return mapper.writeValueAsString(v);
+			int[][] gray = toGrayResized(img, SIZE, SIZE);
+			equalize(gray, SIZE, SIZE);
+			int[] v = new int[DIM];
+			for (int y = 0; y < SIZE; y++) {
+				for (int x = 0; x < SIZE; x++) v[y * SIZE + x] = gray[y][x];
+			}
+			return v;
 		} catch (Exception e) {
 			return null;
 		}
 	}
 
-	public int[] parse(String json) {
-		try {
-			return mapper.readValue(json, int[].class);
-		} catch (Exception e) {
-			return null;
-		}
-	}
+	// ===== PCA 학습 / 투영 / 비교 =====
 
 	/**
-	 * 입력 얼굴(probe)을 등록 얼굴들(gallery)과 PCA 고유공간에서 비교해 가장 가까운 회원 id를 반환한다.
-	 * 임계값 이내가 없으면 null. 최근접 거리는 콘솔 로그로 남긴다(임계값 조정용).
+	 * 얼굴 벡터들로 PCA 모델(평균 + 고유얼굴)을 학습한다. 2개 이상 필요(미만이면 null).
+	 * 소표본 트릭: 공분산 D×D 대신 L = AAᵀ(M×M)의 고유분해(Jacobi)로 계산한다.
 	 */
-	public String recognize(int[] probe, List<String> ids, List<int[]> gallery) {
-		if (probe == null || probe.length != DIM || ids.isEmpty()) {
+	public Model buildModel(List<int[]> faces) {
+		int m = faces.size();
+		if (m < 2) {
 			return null;
 		}
-		int m = ids.size();
-		double[] p = scale(probe);
 		double[][] G = new double[m][];
 		for (int i = 0; i < m; i++) {
-			G[i] = scale(gallery.get(i));
+			if (faces.get(i) == null || faces.get(i).length != DIM) {
+				return null;
+			}
+			G[i] = scale(faces.get(i));
 		}
-
-		// [학습 1] 평균 얼굴
+		// 평균 얼굴 + 중심화
 		double[] mean = new double[DIM];
 		for (double[] g : G) {
 			for (int k = 0; k < DIM; k++) mean[k] += g[k];
 		}
 		for (int k = 0; k < DIM; k++) mean[k] /= m;
-
-		// 중심화
 		double[][] A = new double[m][DIM];
 		for (int i = 0; i < m; i++) {
 			for (int k = 0; k < DIM; k++) A[i][k] = G[i][k] - mean[k];
 		}
-		double[] phi = new double[DIM];
-		for (int k = 0; k < DIM; k++) phi[k] = p[k] - mean[k];
-
-		int K = Math.min(MAX_COMPONENTS, m - 1);
-		if (K < 1) {
-			// 등록 얼굴 1장 — 고유공간을 만들 수 없어 정규화 픽셀로 직접 비교
-			double d = euclid(p, G[0], DIM);
-			System.out.println("[FaceLogin/PCA] single-face dist=" + d);
-			return d <= SINGLE_THRESHOLD ? ids.get(0) : null;
-		}
-
-		// [학습 2] 소표본 PCA: L = AAᵀ (M×M) 의 고유분해
+		// L = AAᵀ (M×M) 고유분해
 		double[][] L = new double[m][m];
 		for (int i = 0; i < m; i++) {
 			for (int j = i; j < m; j++) {
@@ -134,7 +130,7 @@ public class EigenFaceRecognizer {
 		for (int i = 0; i < m; i++) order[i] = i;
 		Arrays.sort(order, (x, y) -> Double.compare(eval[y], eval[x]));
 
-		// [학습 3] 상위 고유얼굴 = A·v (정규화)
+		int K = Math.min(MAX_COMPONENTS, m - 1);
 		double[][] U = new double[K][];
 		int kept = 0;
 		for (int c = 0; c < K; c++) {
@@ -157,21 +153,34 @@ public class EigenFaceRecognizer {
 		if (kept < 1) {
 			return null;
 		}
+		return new Model(mean, Arrays.copyOf(U, kept));
+	}
 
-		// [인식] 고유공간 투영 후 최근접
-		double[] wp = project(phi, U, kept);
-		String bestId = null;
-		double bestDist = Double.MAX_VALUE;
-		for (int i = 0; i < m; i++) {
-			double[] wi = project(A[i], U, kept);
-			double d = euclid(wp, wi, kept);
-			if (d < bestDist) {
-				bestDist = d;
-				bestId = ids.get(i);
-			}
+	/** 얼굴 벡터를 모델의 고유공간에 투영 → 가중치 벡터(double[K]). 실패 시 null */
+	public double[] project(Model model, int[] face) {
+		if (model == null || !model.valid() || face == null || face.length != DIM) {
+			return null;
 		}
-		System.out.println("[FaceLogin/PCA] best=" + bestId + " dist=" + bestDist + " (eigen K=" + kept + ")");
-		return bestDist <= MATCH_THRESHOLD ? bestId : null;
+		double[] f = scale(face);
+		double[] phi = new double[DIM];
+		for (int k = 0; k < DIM; k++) phi[k] = f[k] - model.mean[k];
+		int K = model.eigenfaces.length;
+		double[] w = new double[K];
+		for (int c = 0; c < K; c++) w[c] = dot(model.eigenfaces[c], phi);
+		return w;
+	}
+
+	/** 두 가중치 벡터의 유클리드 거리. 길이가 다르면 무한대 */
+	public double distance(double[] a, double[] b) {
+		if (a == null || b == null || a.length != b.length) {
+			return Double.MAX_VALUE;
+		}
+		double s = 0;
+		for (int i = 0; i < a.length; i++) {
+			double d = a[i] - b[i];
+			s += d * d;
+		}
+		return Math.sqrt(s);
 	}
 
 	// ===== 선형대수 =====
@@ -186,21 +195,6 @@ public class EigenFaceRecognizer {
 		double s = 0;
 		for (int i = 0; i < a.length; i++) s += a[i] * b[i];
 		return s;
-	}
-
-	private double euclid(double[] a, double[] b, int n) {
-		double s = 0;
-		for (int i = 0; i < n; i++) {
-			double d = a[i] - b[i];
-			s += d * d;
-		}
-		return Math.sqrt(s);
-	}
-
-	private double[] project(double[] phi, double[][] U, int k) {
-		double[] w = new double[k];
-		for (int c = 0; c < k; c++) w[c] = dot(U[c], phi);
-		return w;
 	}
 
 	/** 대칭행렬 Jacobi 고유분해 — d=고유값, v의 열=고유벡터 */
@@ -240,19 +234,7 @@ public class EigenFaceRecognizer {
 		for (int i = 0; i < n; i++) d[i] = a[i][i];
 	}
 
-	// ===== 이미지 전처리 (LBPH 인식기와 동일 방식) =====
-
-	private BufferedImage decode(String imageData) {
-		try {
-			String base64 = imageData.contains(",")
-					? imageData.substring(imageData.indexOf(',') + 1)
-					: imageData;
-			byte[] bytes = Base64.getDecoder().decode(base64.trim());
-			return ImageIO.read(new ByteArrayInputStream(bytes));
-		} catch (Exception e) {
-			return null;
-		}
-	}
+	// ===== 이미지 전처리 =====
 
 	private int[][] toGrayResized(BufferedImage src, int w, int h) {
 		BufferedImage dst = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);

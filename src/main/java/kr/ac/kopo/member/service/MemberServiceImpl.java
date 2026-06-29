@@ -2,6 +2,7 @@ package kr.ac.kopo.member.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import kr.ac.kopo.member.dao.MemberDAO;
 import kr.ac.kopo.member.face.EigenFaceRecognizer;
+import kr.ac.kopo.member.face.FaceStore;
 import kr.ac.kopo.member.vo.MemberVO;
 
 @Service
@@ -89,10 +91,13 @@ public class MemberServiceImpl implements MemberService {
 		memberDAO.updateNicknameChanged(id);
 	}
 
-	// ===== M-09 얼굴 로그인 (Eigenfaces/PCA) =====
+	// ===== M-09 얼굴 로그인 (Eigenfaces/PCA · 모델 영속화) =====
 
 	@Autowired
 	private EigenFaceRecognizer faceRecognizer;
+
+	@Autowired
+	private FaceStore faceStore;
 
 	@Override
 	public boolean saveFace(String id, String imageData) {
@@ -100,31 +105,73 @@ public class MemberServiceImpl implements MemberService {
 		if (face == null) {
 			return false; // 이미지 디코드/추출 실패
 		}
-		memberDAO.updateFaceDescriptor(id, faceRecognizer.toJson(face));
+		faceStore.saveSample(id, imageData);   // 원본 얼굴 저장(재학습용)
+
+		if (faceStore.modelExists()) {
+			// 모델이 이미 있으면: 기존 고유공간에 새 얼굴만 투영해 벡터 저장
+			EigenFaceRecognizer.Model model =
+					new EigenFaceRecognizer.Model(faceStore.loadMean(), faceStore.loadEigenfaces());
+			double[] w = faceRecognizer.project(model, face);
+			if (w == null) {
+				return false;
+			}
+			faceStore.saveVector(id, w);
+		} else {
+			// 모델이 없으면: 샘플이 2명 이상 모였을 때 초기 PCA 모델을 1회 학습
+			buildInitialModelIfPossible();
+		}
 		return true;
+	}
+
+	/** 초기 PCA 모델 학습 — 샘플이 2개 이상이면 평균·고유얼굴 공간을 만들고 전원 투영 벡터를 저장한다. */
+	private void buildInitialModelIfPossible() {
+		List<String> okIds = new ArrayList<>();
+		List<int[]> faces = new ArrayList<>();
+		for (String sid : faceStore.sampleIds()) {
+			int[] v = faceRecognizer.extractFaceFromBytes(faceStore.sampleBytes(sid));
+			if (v != null) {
+				okIds.add(sid);
+				faces.add(v);
+			}
+		}
+		EigenFaceRecognizer.Model model = faceRecognizer.buildModel(faces);
+		if (model == null) {
+			return; // 아직 2명 미만 — 다음 등록 때 다시 시도
+		}
+		faceStore.saveModel(model.mean, model.eigenfaces);
+		for (int i = 0; i < okIds.size(); i++) {
+			faceStore.saveVector(okIds.get(i), faceRecognizer.project(model, faces.get(i)));
+		}
 	}
 
 	@Override
 	public boolean hasFace(String id) {
-		return memberDAO.countFace(id) > 0;
+		return faceStore.vectorExists(id);
 	}
 
 	@Override
 	public String matchFace(String imageData) {
 		int[] probe = faceRecognizer.extractFace(imageData);
-		if (probe == null) {
+		if (probe == null || !faceStore.modelExists()) {
 			return null;
 		}
-		// 등록된 얼굴들을 모아 PCA 고유공간에서 1:N 비교 (recognize 내부에서 최근접 거리 로그)
-		List<String> ids = new ArrayList<>();
-		List<int[]> faces = new ArrayList<>();
-		for (MemberVO m : memberDAO.selectAllFaces()) {
-			int[] f = faceRecognizer.parse(m.getFaceDescriptor());
-			if (f != null && f.length == EigenFaceRecognizer.DIM) {   // 옛 형식(LBPH 등) 데이터는 건너뜀
-				ids.add(m.getId());
-				faces.add(f);
+		EigenFaceRecognizer.Model model =
+				new EigenFaceRecognizer.Model(faceStore.loadMean(), faceStore.loadEigenfaces());
+		double[] pw = faceRecognizer.project(model, probe);
+		if (pw == null) {
+			return null;
+		}
+		// 저장된 회원 벡터들과 고유공간에서 1:N 최근접 비교
+		String bestId = null;
+		double bestDist = Double.MAX_VALUE;
+		for (Map.Entry<String, double[]> e : faceStore.allVectors().entrySet()) {
+			double d = faceRecognizer.distance(pw, e.getValue());
+			if (d < bestDist) {
+				bestDist = d;
+				bestId = e.getKey();
 			}
 		}
-		return faceRecognizer.recognize(probe, ids, faces);
+		System.out.println("[FaceLogin/PCA] best=" + bestId + " dist=" + bestDist);
+		return bestDist <= EigenFaceRecognizer.MATCH_THRESHOLD ? bestId : null;
 	}
 }
