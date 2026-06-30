@@ -119,6 +119,16 @@ public class MemberServiceImpl implements MemberService {
 		} else {
 			// 모델이 없으면: 샘플이 2명 이상 모였을 때 초기 PCA 모델을 1회 학습
 			buildInitialModelIfPossible();
+			// 아직 모델이 없다면(등록 1명) PCA 대신 정규화 픽셀 벡터를 폴백 저장해
+			// '등록됨' 상태로 만들고 1명만으로도 얼굴 로그인이 되게 한다.
+			// 2번째 등록 때 buildInitialModelIfPossible()가 전원 PCA 벡터로 덮어쓴다.
+			if (!faceStore.modelExists()) {
+				double[] raw = faceRecognizer.rawVector(face);
+				if (raw == null) {
+					return false;
+				}
+				faceStore.saveVector(id, raw);
+			}
 		}
 		return true;
 	}
@@ -152,16 +162,32 @@ public class MemberServiceImpl implements MemberService {
 	@Override
 	public String matchFace(String imageData) {
 		int[] probe = faceRecognizer.extractFace(imageData);
-		if (probe == null || !faceStore.modelExists()) {
+		if (probe == null) {
 			return null;
 		}
-		EigenFaceRecognizer.Model model =
-				new EigenFaceRecognizer.Model(faceStore.loadMean(), faceStore.loadEigenfaces());
-		double[] pw = faceRecognizer.project(model, probe);
+
+		// 비교에 쓸 프로브 벡터와 임계값을 모드에 따라 결정한다.
+		// - PCA 모델 있음(2명 이상): 고유공간 투영 벡터 + MATCH_THRESHOLD
+		// - 모델 없음(1명, 폴백):   정규화 픽셀 벡터 + RAW_MATCH_THRESHOLD
+		double[] pw;
+		double threshold;
+		String mode;
+		if (faceStore.modelExists()) {
+			EigenFaceRecognizer.Model model =
+					new EigenFaceRecognizer.Model(faceStore.loadMean(), faceStore.loadEigenfaces());
+			pw = faceRecognizer.project(model, probe);
+			threshold = EigenFaceRecognizer.MATCH_THRESHOLD;
+			mode = "PCA";
+		} else {
+			pw = faceRecognizer.rawVector(probe);
+			threshold = EigenFaceRecognizer.RAW_MATCH_THRESHOLD;
+			mode = "RAW";
+		}
 		if (pw == null) {
 			return null;
 		}
-		// 저장된 회원 벡터들과 고유공간에서 1:N 최근접 비교
+
+		// 저장된 회원 벡터들과 1:N 최근접 비교(길이가 다른 벡터는 distance가 무한대라 자동 제외)
 		String bestId = null;
 		double bestDist = Double.MAX_VALUE;
 		for (Map.Entry<String, double[]> e : faceStore.allVectors().entrySet()) {
@@ -171,7 +197,7 @@ public class MemberServiceImpl implements MemberService {
 				bestId = e.getKey();
 			}
 		}
-		System.out.println("[FaceLogin/PCA] best=" + bestId + " dist=" + bestDist);
-		return bestDist <= EigenFaceRecognizer.MATCH_THRESHOLD ? bestId : null;
+		System.out.println("[FaceLogin/" + mode + "] best=" + bestId + " dist=" + bestDist);
+		return bestDist <= threshold ? bestId : null;
 	}
 }

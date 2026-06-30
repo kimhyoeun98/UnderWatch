@@ -37,6 +37,13 @@ public class EigenFaceRecognizer {
 	 */
 	public static final double MATCH_THRESHOLD = 3.5;
 
+	/**
+	 * 등록된 얼굴이 1명뿐이라 PCA 모델을 만들 수 없을 때(소표본) 사용하는 폴백 임계값.
+	 * 이때는 고유공간 투영 대신 정규화 픽셀 벡터(0~1, 길이 DIM)를 그대로 비교한다.
+	 * 픽셀 공간 유클리드 거리는 스케일이 달라 별도 임계값을 둔다(콘솔 dist 로그로 조정).
+	 */
+	public static final double RAW_MATCH_THRESHOLD = 12.0;
+
 	/** 학습된 PCA 모델: 평균 얼굴 + 고유얼굴(정규화 K개) */
 	public static class Model {
 		public final double[] mean;        // 길이 DIM
@@ -168,6 +175,17 @@ public class EigenFaceRecognizer {
 		double[] w = new double[K];
 		for (int c = 0; c < K; c++) w[c] = dot(model.eigenfaces[c], phi);
 		return w;
+	}
+
+	/**
+	 * 정규화 픽셀 벡터(0~1, 길이 DIM)를 그대로 반환한다. PCA 모델이 아직 없을 때
+	 * (등록 1명) {@code .vec} 폴백 저장/비교에 쓴다. 모델이 생기면 PCA 벡터로 덮어쓴다.
+	 */
+	public double[] rawVector(int[] face) {
+		if (face == null || face.length != DIM) {
+			return null;
+		}
+		return scale(face);
 	}
 
 	/** 두 가중치 벡터의 유클리드 거리. 길이가 다르면 무한대 */
