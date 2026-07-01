@@ -128,6 +128,143 @@ public class GameService {
 	private final HttpClient client = HttpClient.newHttpClient();
 	private final ObjectMapper mapper = new ObjectMapper();
 
+	/**
+	 * G-04 전적검색 — 배틀태그로 플레이어 요약(랭크/인도점수/아바타) 조회.
+	 * 입력 "Name#1234" → OverFast player_id "Name-1234". 비공개/없음이면 error 맵 반환.
+	 */
+	public Map<String, Object> getPlayerSummary(String battleTag) {
+		if (battleTag == null || battleTag.isBlank()) {
+			return null;
+		}
+		String playerId = battleTag.trim().replace('#', '-');
+		try {
+			HttpRequest req = HttpRequest.newBuilder()
+					.uri(URI.create(BASE + "/players/" + playerId + "/summary"))
+					.header("Accept", "application/json").GET().build();
+			HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+			if (resp.statusCode() != 200) {
+				return Map.of("error", true, "status", resp.statusCode());
+			}
+			Map<String, Object> summary = mapper.readValue(resp.body(),
+					new TypeReference<Map<String, Object>>() {});
+			if (summary == null || summary.get("username") == null) {
+				return Map.of("error", true, "status", 404);
+			}
+			return summary;
+		} catch (Exception e) {
+			return Map.of("error", true, "status", -1);
+		}
+	}
+
+	/** 영웅 → 역할(tank/damage/support). 막대 색상 구분용. 모르는 영웅은 빈 문자열. */
+	private static final Map<String, String> HERO_ROLE = Map.ofEntries(
+		Map.entry("dva", "tank"),          Map.entry("doomfist", "tank"),     Map.entry("junker-queen", "tank"),
+		Map.entry("mauga", "tank"),        Map.entry("orisa", "tank"),        Map.entry("ramattra", "tank"),
+		Map.entry("reinhardt", "tank"),    Map.entry("roadhog", "tank"),      Map.entry("sigma", "tank"),
+		Map.entry("winston", "tank"),      Map.entry("wrecking-ball", "tank"),Map.entry("zarya", "tank"),
+		Map.entry("hazard", "tank"),
+		Map.entry("ashe", "damage"),       Map.entry("bastion", "damage"),    Map.entry("cassidy", "damage"),
+		Map.entry("echo", "damage"),       Map.entry("genji", "damage"),      Map.entry("hanzo", "damage"),
+		Map.entry("junkrat", "damage"),    Map.entry("mei", "damage"),        Map.entry("pharah", "damage"),
+		Map.entry("reaper", "damage"),     Map.entry("sojourn", "damage"),    Map.entry("soldier-76", "damage"),
+		Map.entry("sombra", "damage"),     Map.entry("symmetra", "damage"),   Map.entry("torbjorn", "damage"),
+		Map.entry("tracer", "damage"),     Map.entry("venture", "damage"),    Map.entry("widowmaker", "damage"),
+		Map.entry("freja", "damage"),
+		Map.entry("ana", "support"),       Map.entry("baptiste", "support"),  Map.entry("brigitte", "support"),
+		Map.entry("illari", "support"),    Map.entry("juno", "support"),      Map.entry("kiriko", "support"),
+		Map.entry("lifeweaver", "support"),Map.entry("lucio", "support"),     Map.entry("mercy", "support"),
+		Map.entry("moira", "support"),     Map.entry("zenyatta", "support")
+	);
+
+	/**
+	 * G-04 전적검색 — 빠른대전·경쟁전 두 모드의 종합/영웅별 전적을 한 번에 JSON 으로 반환한다.
+	 * 화면(JS)에서 모드 토글 + 지표별 내림차순 정렬을 한다. 비공개/없음이면 "null".
+	 */
+	public String getPlayerStatsJson(String battleTag) {
+		if (battleTag == null || battleTag.isBlank()) {
+			return "null";
+		}
+		String playerId = battleTag.trim().replace('#', '-');
+		Map<String, Object> result = new LinkedHashMap<>();
+		result.put("quickplay", fetchStats(playerId, "quickplay"));
+		result.put("competitive", fetchStats(playerId, "competitive"));
+		try {
+			return mapper.writeValueAsString(result);
+		} catch (Exception e) {
+			return "null";
+		}
+	}
+
+	/** 한 게임모드의 stats/summary 를 받아 general + 영웅별 전 지표 리스트로 가공. 없으면 null. */
+	@SuppressWarnings("unchecked")
+	private Map<String, Object> fetchStats(String playerId, String gamemode) {
+		try {
+			HttpRequest req = HttpRequest.newBuilder()
+					.uri(URI.create(BASE + "/players/" + playerId + "/stats/summary?gamemode=" + gamemode))
+					.header("Accept", "application/json").GET().build();
+			HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+			if (resp.statusCode() != 200) {
+				return null;
+			}
+			Map<String, Object> data = mapper.readValue(resp.body(),
+					new TypeReference<Map<String, Object>>() {});
+			if (data == null) {
+				return null;
+			}
+			Map<String, Object> general = (Map<String, Object>) data.get("general");
+			Map<String, Object> heroes = (Map<String, Object>) data.get("heroes");
+			if (general == null || heroes == null) {
+				return null;
+			}
+
+			List<Map<String, Object>> list = new ArrayList<>();
+			for (Map.Entry<String, Object> e : heroes.entrySet()) {
+				Map<String, Object> h = (Map<String, Object>) e.getValue();
+				if (h == null) {
+					continue;
+				}
+				Map<String, Object> avg = (Map<String, Object>) h.getOrDefault("average", Map.of());
+				Map<String, Object> item = new LinkedHashMap<>();
+				item.put("key", e.getKey());
+				item.put("nameKr", krName(e.getKey(), e.getKey()));
+				item.put("role", HERO_ROLE.getOrDefault(e.getKey(), ""));
+				item.put("timePlayed", num(h.get("time_played")));
+				item.put("gamesPlayed", num(h.get("games_played")));
+				item.put("gamesWon", num(h.get("games_won")));
+				item.put("winrate", num(h.get("winrate")));
+				item.put("kda", num(h.get("kda")));
+				item.put("elims", num(avg.get("eliminations")));    // 10분당 평균
+				item.put("assists", num(avg.get("assists")));
+				item.put("deaths", num(avg.get("deaths")));
+				item.put("damage", num(avg.get("damage")));
+				item.put("healing", num(avg.get("healing")));
+				list.add(item);
+			}
+
+			Map<String, Object> out = new LinkedHashMap<>();
+			out.put("general", general);
+			out.put("generalTime", formatDuration(general.get("time_played")));
+			out.put("heroes", list);
+			return out;
+		} catch (Exception e) {
+			return null;
+		}
+	}
+
+	/** Object → double (숫자가 아니면 0). */
+	private double num(Object o) {
+		return (o instanceof Number n) ? n.doubleValue() : 0d;
+	}
+
+	/** 초 → "H:MM:SS" 문자열. */
+	private String formatDuration(Object secondsObj) {
+		if (!(secondsObj instanceof Number)) {
+			return "-";
+		}
+		long s = ((Number) secondsObj).longValue();
+		return String.format("%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60);
+	}
+
 	/** 영웅 목록 (role: tank/damage/support) — 각 항목에 nameKr 추가 */
 	public List<Map<String, Object>> getHeroes(String role) {
 		try {

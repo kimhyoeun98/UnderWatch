@@ -58,20 +58,34 @@
               <form:errors path="name" cssClass="text-danger small" />
             </div>
 
-            <!-- 전화번호 -->
+            <!-- 전화번호 (하이픈 자동 입력) -->
             <div class="mb-3">
               <label class="form-label">전화번호</label>
-              <form:input path="phone" cssClass="form-control" placeholder="010-1234-5678" />
+              <form:input path="phone" cssClass="form-control" id="phoneInput"
+                          placeholder="숫자만 입력하면 자동으로 - 가 들어갑니다" maxlength="13" />
               <form:errors path="phone" cssClass="text-danger small" />
             </div>
 
-            <!-- 이메일 -->
+            <!-- 이메일 (아이디 + @ + 도메인 선택/직접입력) -->
             <div class="mb-3">
               <label class="form-label">이메일 <span class="text-danger">*</span></label>
               <div class="input-group">
-                <form:input path="email" cssClass="form-control" type="email" />
+                <input type="text" id="emailLocal" class="form-control" placeholder="아이디" autocomplete="off" />
+                <span class="input-group-text">@</span>
+                <input type="text" id="emailDomain" class="form-control" placeholder="도메인" autocomplete="off" />
+                <select id="emailDomainSelect" class="form-select" style="max-width:150px">
+                  <option value="">직접입력</option>
+                  <option value="gmail.com">gmail.com</option>
+                  <option value="naver.com">naver.com</option>
+                  <option value="daum.net">daum.net</option>
+                  <option value="kakao.com">kakao.com</option>
+                  <option value="nate.com">nate.com</option>
+                  <option value="hanmail.net">hanmail.net</option>
+                </select>
                 <button type="button" class="btn btn-outline-secondary" onclick="checkEmail()">중복확인</button>
               </div>
+              <%-- 실제 서버로 전송되는 이메일(아이디@도메인 결합값) --%>
+              <form:hidden path="email" />
               <div id="emailMsg" class="form-text"></div>
               <c:if test="${not empty emailError}">
                 <div class="text-danger small">${emailError}</div>
@@ -116,8 +130,14 @@ function checkNickname() {
 }
 
 function checkEmail() {
-  const email = document.querySelector('[name="email"]').value;
-  if (!email) return;
+  syncEmail();
+  const email = document.querySelector('input[name="email"]').value;
+  if (!email || email.indexOf('@') < 1) {
+    const el = document.getElementById('emailMsg');
+    el.textContent = '이메일을 올바르게 입력하세요.';
+    el.className = 'form-text text-danger';
+    return;
+  }
   fetch(ctx + '/member/emailCheck?email=' + encodeURIComponent(email))
     .then(r => r.text())
     .then(msg => {
@@ -126,6 +146,66 @@ function checkEmail() {
       el.className = 'form-text ' + (msg === 'OK' ? 'text-success' : 'text-danger');
     });
 }
+
+/* ===== #2 전화번호 자동 하이픈 ===== */
+(function () {
+  const p = document.getElementById('phoneInput');
+  if (!p) return;
+  p.addEventListener('input', function () {
+    let d = p.value.replace(/[^0-9]/g, '').slice(0, 11);
+    if (d.startsWith('02')) {                 // 서울 지역번호(2자리)
+      if (d.length > 9) p.value = d.replace(/(\d{2})(\d{4})(\d{1,4})/, '$1-$2-$3');
+      else if (d.length > 5) p.value = d.replace(/(\d{2})(\d{3,4})(\d{1,4})/, '$1-$2-$3');
+      else if (d.length > 2) p.value = d.replace(/(\d{2})(\d{1,4})/, '$1-$2');
+      else p.value = d;
+    } else {                                  // 휴대폰/그 외(3자리)
+      if (d.length > 7) p.value = d.replace(/(\d{3})(\d{4})(\d{1,4})/, '$1-$2-$3');
+      else if (d.length > 3) p.value = d.replace(/(\d{3})(\d{1,4})/, '$1-$2');
+      else p.value = d;
+    }
+  });
+})();
+
+/* ===== #3 이메일: 아이디 + @ + 도메인 결합 ===== */
+const emailLocal  = document.getElementById('emailLocal');
+const emailDomain = document.getElementById('emailDomain');
+const emailSelect = document.getElementById('emailDomainSelect');
+const emailHidden = document.querySelector('input[name="email"]');
+
+function syncEmail() {
+  const local  = (emailLocal.value || '').trim();
+  const domain = (emailDomain.value || '').trim();
+  emailHidden.value = (local && domain) ? (local + '@' + domain) : '';
+}
+
+emailSelect.addEventListener('change', function () {
+  if (this.value) {                 // 프리셋 도메인 선택 → 고정
+    emailDomain.value = this.value;
+    emailDomain.readOnly = true;
+  } else {                          // 직접입력
+    emailDomain.value = '';
+    emailDomain.readOnly = false;
+    emailDomain.focus();
+  }
+  syncEmail();
+});
+emailLocal.addEventListener('input', syncEmail);
+emailDomain.addEventListener('input', syncEmail);
+
+/* 검증 실패로 되돌아온 경우: 기존 결합 이메일을 분리해 복원 */
+(function initEmail() {
+  const cur = (emailHidden.value || '').trim();
+  if (cur.indexOf('@') > 0) {
+    const parts = cur.split('@');
+    emailLocal.value = parts[0];
+    emailDomain.value = parts[1];
+    const opt = [...emailSelect.options].find(o => o.value === parts[1]);
+    if (opt) { emailSelect.value = parts[1]; emailDomain.readOnly = true; }
+  }
+})();
+
+/* 제출 직전 결합값 보장 */
+emailHidden.form.addEventListener('submit', syncEmail);
 </script>
 
 <jsp:include page="/WEB-INF/jsp/common/footer.jsp" />

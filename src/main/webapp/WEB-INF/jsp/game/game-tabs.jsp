@@ -7,4 +7,6 @@
      class="ow-game-tab ${pageTitle == '맵 정보' ? 'active' : ''}">맵</a>
   <a href="${pageContext.request.contextPath}/game/patches"
      class="ow-game-tab ${pageTitle == '패치 노트' ? 'active' : ''}">패치 노트</a>
+  <a href="${pageContext.request.contextPath}/game/player"
+     class="ow-game-tab ${pageTitle == '전적 검색' ? 'active' : ''}">전적 검색</a>
 </div>

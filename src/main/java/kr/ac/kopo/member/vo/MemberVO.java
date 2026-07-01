@@ -20,7 +20,8 @@ public class MemberVO {
 	@NotEmpty(message = "이름을 입력하세요.")
 	private String name;
 
-	@Pattern(regexp = "^$|^\\d{3}-\\d{3,4}-\\d{4}$", message = "전화번호 형식이 올바르지 않습니다. (예: 010-1234-5678)")
+	// 하이픈은 선택. 숫자만 입력해도 통과(서버에서 표준 형식으로 정규화 저장). 예: 01012345678 또는 010-1234-5678
+	@Pattern(regexp = "^$|^0\\d{1,2}-?\\d{3,4}-?\\d{4}$", message = "전화번호 형식이 올바르지 않습니다. (예: 010-1234-5678)")
 	private String phone;
 
 	@NotEmpty(message = "이메일을 입력하세요.")

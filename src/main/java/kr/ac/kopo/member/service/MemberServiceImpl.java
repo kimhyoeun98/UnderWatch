@@ -1,16 +1,13 @@
 package kr.ac.kopo.member.service;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import kr.ac.kopo.member.dao.MemberDAO;
-import kr.ac.kopo.member.face.EigenFaceRecognizer;
-import kr.ac.kopo.member.face.FaceStore;
+import kr.ac.kopo.member.face.FaceApiClient;
 import kr.ac.kopo.member.vo.MemberVO;
 
 @Service
@@ -25,7 +22,32 @@ public class MemberServiceImpl implements MemberService {
 	@Override
 	public void register(MemberVO member) {
 		member.setPassword(passwordEncoder.encode(member.getPassword()));
+		member.setPhone(normalizePhone(member.getPhone()));   // 하이픈 유무와 무관하게 표준 형식으로 저장
 		memberDAO.insert(member);
+	}
+
+	/** 전화번호를 숫자만 추출해 표준 하이픈 형식(010-1234-5678 / 02-123-4567 등)으로 정규화. */
+	private String normalizePhone(String phone) {
+		if (phone == null) {
+			return null;
+		}
+		String d = phone.replaceAll("[^0-9]", "");
+		if (d.isEmpty()) {
+			return phone;   // 미입력(선택 항목)
+		}
+		if (d.length() == 11) {                       // 010-1234-5678
+			return d.replaceFirst("(\\d{3})(\\d{4})(\\d{4})", "$1-$2-$3");
+		}
+		if (d.length() == 10 && d.startsWith("02")) { // 02-1234-5678
+			return d.replaceFirst("(\\d{2})(\\d{4})(\\d{4})", "$1-$2-$3");
+		}
+		if (d.length() == 10) {                       // 010-123-4567 / 031-123-4567
+			return d.replaceFirst("(\\d{3})(\\d{3})(\\d{4})", "$1-$2-$3");
+		}
+		if (d.length() == 9 && d.startsWith("02")) {  // 02-123-4567
+			return d.replaceFirst("(\\d{2})(\\d{3})(\\d{4})", "$1-$2-$3");
+		}
+		return phone;   // 예외 길이는 입력값 유지(패턴 검증에서 이미 걸러짐)
 	}
 
 	@Override
@@ -91,113 +113,93 @@ public class MemberServiceImpl implements MemberService {
 		memberDAO.updateNicknameChanged(id);
 	}
 
-	// ===== M-09 얼굴 로그인 (Eigenfaces/PCA · 모델 영속화) =====
+	// ===== M-09 얼굴 로그인 (외부 API: InsightFace ArcFace 임베딩 + 코사인 비교) =====
 
 	@Autowired
-	private EigenFaceRecognizer faceRecognizer;
+	private FaceApiClient faceApi;
 
-	@Autowired
-	private FaceStore faceStore;
+	/**
+	 * 같은 사람으로 인정하는 최소 코사인 유사도. ArcFace(정규화 임베딩) 기준
+	 * 본인은 보통 0.5 이상, 남은 0.3 미만으로 나온다. 콘솔의 cos 로그를 보고 조정한다.
+	 */
+	private static final double COS_THRESHOLD = 0.38;
 
 	@Override
 	public boolean saveFace(String id, String imageData) {
-		int[] face = faceRecognizer.extractFace(imageData);
-		if (face == null) {
-			return false; // 이미지 디코드/추출 실패
+		double[] emb = faceApi.embed(imageData);
+		if (emb == null) {
+			return false; // 얼굴 미검출 또는 API 오류
 		}
-		faceStore.saveSample(id, imageData);   // 원본 얼굴 저장(재학습용)
-
-		if (faceStore.modelExists()) {
-			// 모델이 이미 있으면: 기존 고유공간에 새 얼굴만 투영해 벡터 저장
-			EigenFaceRecognizer.Model model =
-					new EigenFaceRecognizer.Model(faceStore.loadMean(), faceStore.loadEigenfaces());
-			double[] w = faceRecognizer.project(model, face);
-			if (w == null) {
-				return false;
-			}
-			faceStore.saveVector(id, w);
-		} else {
-			// 모델이 없으면: 샘플이 2명 이상 모였을 때 초기 PCA 모델을 1회 학습
-			buildInitialModelIfPossible();
-			// 아직 모델이 없다면(등록 1명) PCA 대신 정규화 픽셀 벡터를 폴백 저장해
-			// '등록됨' 상태로 만들고 1명만으로도 얼굴 로그인이 되게 한다.
-			// 2번째 등록 때 buildInitialModelIfPossible()가 전원 PCA 벡터로 덮어쓴다.
-			if (!faceStore.modelExists()) {
-				double[] raw = faceRecognizer.rawVector(face);
-				if (raw == null) {
-					return false;
-				}
-				faceStore.saveVector(id, raw);
-			}
-		}
+		memberDAO.updateFaceDescriptor(id, encode(emb));   // 임베딩 JSON 을 ow_member 에 저장
 		return true;
-	}
-
-	/** 초기 PCA 모델 학습 — 샘플이 2개 이상이면 평균·고유얼굴 공간을 만들고 전원 투영 벡터를 저장한다. */
-	private void buildInitialModelIfPossible() {
-		List<String> okIds = new ArrayList<>();
-		List<int[]> faces = new ArrayList<>();
-		for (String sid : faceStore.sampleIds()) {
-			int[] v = faceRecognizer.extractFaceFromBytes(faceStore.sampleBytes(sid));
-			if (v != null) {
-				okIds.add(sid);
-				faces.add(v);
-			}
-		}
-		EigenFaceRecognizer.Model model = faceRecognizer.buildModel(faces);
-		if (model == null) {
-			return; // 아직 2명 미만 — 다음 등록 때 다시 시도
-		}
-		faceStore.saveModel(model.mean, model.eigenfaces);
-		for (int i = 0; i < okIds.size(); i++) {
-			faceStore.saveVector(okIds.get(i), faceRecognizer.project(model, faces.get(i)));
-		}
 	}
 
 	@Override
 	public boolean hasFace(String id) {
-		return faceStore.vectorExists(id);
+		return memberDAO.countFace(id) > 0;
 	}
 
 	@Override
 	public String matchFace(String imageData) {
-		int[] probe = faceRecognizer.extractFace(imageData);
+		double[] probe = faceApi.embed(imageData);
 		if (probe == null) {
 			return null;
 		}
-
-		// 비교에 쓸 프로브 벡터와 임계값을 모드에 따라 결정한다.
-		// - PCA 모델 있음(2명 이상): 고유공간 투영 벡터 + MATCH_THRESHOLD
-		// - 모델 없음(1명, 폴백):   정규화 픽셀 벡터 + RAW_MATCH_THRESHOLD
-		double[] pw;
-		double threshold;
-		String mode;
-		if (faceStore.modelExists()) {
-			EigenFaceRecognizer.Model model =
-					new EigenFaceRecognizer.Model(faceStore.loadMean(), faceStore.loadEigenfaces());
-			pw = faceRecognizer.project(model, probe);
-			threshold = EigenFaceRecognizer.MATCH_THRESHOLD;
-			mode = "PCA";
-		} else {
-			pw = faceRecognizer.rawVector(probe);
-			threshold = EigenFaceRecognizer.RAW_MATCH_THRESHOLD;
-			mode = "RAW";
-		}
-		if (pw == null) {
-			return null;
-		}
-
-		// 저장된 회원 벡터들과 1:N 최근접 비교(길이가 다른 벡터는 distance가 무한대라 자동 제외)
+		// 등록된 전 회원 임베딩과 1:N 코사인 유사도 비교 → 최고 유사도 회원 선택
 		String bestId = null;
-		double bestDist = Double.MAX_VALUE;
-		for (Map.Entry<String, double[]> e : faceStore.allVectors().entrySet()) {
-			double d = faceRecognizer.distance(pw, e.getValue());
-			if (d < bestDist) {
-				bestDist = d;
-				bestId = e.getKey();
+		double bestCos = -1.0;
+		for (MemberVO m : memberDAO.selectAllFaces()) {
+			double[] v = decode(m.getFaceDescriptor());
+			if (v == null) {
+				continue;
+			}
+			double cos = cosine(probe, v);
+			if (cos > bestCos) {
+				bestCos = cos;
+				bestId = m.getId();
 			}
 		}
-		System.out.println("[FaceLogin/" + mode + "] best=" + bestId + " dist=" + bestDist);
-		return bestDist <= threshold ? bestId : null;
+		System.out.println("[FaceLogin] best=" + bestId + " cos=" + bestCos);
+		return bestCos >= COS_THRESHOLD ? bestId : null;
+	}
+
+	/** 정규화 임베딩 간 코사인 유사도(= 내적). 길이가 다르면 -1. */
+	private double cosine(double[] a, double[] b) {
+		if (a == null || b == null || a.length != b.length) {
+			return -1.0;
+		}
+		double dot = 0;
+		for (int i = 0; i < a.length; i++) dot += a[i] * b[i];
+		return dot;
+	}
+
+	/** double[] → "[v1,v2,...]" JSON 문자열(의존성 없는 단순 직렬화). */
+	private String encode(double[] v) {
+		StringBuilder sb = new StringBuilder("[");
+		for (int i = 0; i < v.length; i++) {
+			if (i > 0) sb.append(',');
+			sb.append(v[i]);
+		}
+		return sb.append(']').toString();
+	}
+
+	/** "[v1,v2,...]" → double[]. 파싱 실패 시 null. */
+	private double[] decode(String json) {
+		if (json == null || json.length() < 2) {
+			return null;
+		}
+		try {
+			String body = json.trim();
+			body = body.substring(body.indexOf('[') + 1, body.lastIndexOf(']'));
+			if (body.trim().isEmpty()) {
+				return null;
+			}
+			String[] parts = body.split(",");
+			double[] v = new double[parts.length];
+			for (int i = 0; i < parts.length; i++) v[i] = Double.parseDouble(parts[i].trim());
+			return v;
+		} catch (Exception e) {
+			return null;
+		}
 	}
 }

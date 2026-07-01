@@ -5,6 +5,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import kr.ac.kopo.game.service.GameService;
 
@@ -55,5 +56,19 @@ public class GameController {
 	public String patches(Model model) {
 		model.addAttribute("patches", gameService.getPatches());
 		return "game/patches";
+	}
+
+	/**
+	 * G-04 전적검색 — 배틀태그(Name#1234)로 플레이어 요약 조회
+	 * GET /game/player?battletag=Name#1234
+	 */
+	@GetMapping("/game/player")
+	public String player(@RequestParam(value = "battletag", required = false) String battletag, Model model) {
+		if (battletag != null && !battletag.isBlank()) {
+			model.addAttribute("battletag", battletag.trim());
+			model.addAttribute("summary", gameService.getPlayerSummary(battletag));
+			model.addAttribute("statsJson", gameService.getPlayerStatsJson(battletag));
+		}
+		return "game/player";
 	}
 }

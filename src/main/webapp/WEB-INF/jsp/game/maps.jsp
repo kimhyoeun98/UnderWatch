@@ -86,71 +86,68 @@
     </c:when>
     <c:otherwise>
 
-      <!-- 게임 모드 필터 -->
-      <div class="gamemode-filter" id="modeFilter">
-        <button class="gamemode-btn active" data-mode="all">전체</button>
-        <button class="gamemode-btn" data-mode="화물 호송">화물 호송</button>
-        <button class="gamemode-btn" data-mode="혼합">혼합</button>
-        <button class="gamemode-btn" data-mode="쟁탈">쟁탈</button>
-        <button class="gamemode-btn" data-mode="밀기">밀기</button>
-        <button class="gamemode-btn" data-mode="거점 장악">거점 장악</button>
-        <button class="gamemode-btn" data-mode="격전">격전</button>
-        <button class="gamemode-btn" data-mode="깃발 쟁탈전">깃발 쟁탈전</button>
-      </div>
+      <!-- #9 게임 모드별 아코디언 -->
+      <div class="accordion" id="mapAccordion">
+        <c:forEach var="mode" items="화물 호송,혼합,쟁탈,밀기,거점 장악,격전,깃발 쟁탈전" varStatus="ms">
+          <c:set var="modeKey" value=",${mode}," />
 
-      <!-- 맵 그리드 -->
-      <div class="map-grid" id="mapGrid">
-        <c:forEach var="m" items="${maps}">
-          <div class="map-card" data-modes="<c:forEach var="gm" items="${m.gamemodesKr}" varStatus="s">${gm}<c:if test="${!s.last}">,</c:if></c:forEach>">
-            <c:choose>
-              <c:when test="${not empty m.screenshot}">
-                <img src="${m.screenshot}" alt="${m.name}" loading="lazy"
-                     onerror="this.style.display='none'">
-              </c:when>
-              <c:otherwise>
-                <div style="height:160px;background:#2a2a3e;display:flex;align-items:center;justify-content:center;">
-                  <span style="color:#555;font-size:2rem;">🗺</span>
+          <%-- 이 모드에 속한 맵 개수 미리 계산(0개면 패널 숨김) --%>
+          <c:set var="modeCount" value="0" />
+          <c:forEach var="m" items="${maps}">
+            <c:set var="modesCsv">,<c:forEach var="gm" items="${m.gamemodesKr}">${gm},</c:forEach></c:set>
+            <c:if test="${fn:contains(modesCsv, modeKey)}"><c:set var="modeCount" value="${modeCount + 1}" /></c:if>
+          </c:forEach>
+
+          <c:if test="${modeCount > 0}">
+            <div class="accordion-item">
+              <h2 class="accordion-header">
+                <button class="accordion-button ${ms.first ? '' : 'collapsed'}" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#mode${ms.index}"
+                        aria-expanded="${ms.first}" aria-controls="mode${ms.index}">
+                  ${mode} <span class="badge bg-warning text-dark ms-2">${modeCount}</span>
+                </button>
+              </h2>
+              <div id="mode${ms.index}" class="accordion-collapse collapse ${ms.first ? 'show' : ''}"
+                   data-bs-parent="#mapAccordion">
+                <div class="accordion-body">
+                  <div class="map-grid">
+                    <c:forEach var="m" items="${maps}">
+                      <c:set var="modesCsv">,<c:forEach var="gm" items="${m.gamemodesKr}">${gm},</c:forEach></c:set>
+                      <c:if test="${fn:contains(modesCsv, modeKey)}">
+                        <div class="map-card">
+                          <c:choose>
+                            <c:when test="${not empty m.screenshot}">
+                              <img src="${m.screenshot}" alt="${m.name}" loading="lazy"
+                                   onerror="this.style.display='none'">
+                            </c:when>
+                            <c:otherwise>
+                              <div style="height:160px;background:#2a2a3e;display:flex;align-items:center;justify-content:center;">
+                                <span style="color:#555;font-size:2rem;">🗺</span>
+                              </div>
+                            </c:otherwise>
+                          </c:choose>
+                          <div class="map-card-body">
+                            <div class="map-card-name"><c:out value="${m.nameKr}"/></div>
+                            <c:if test="${not empty m.location}">
+                              <div class="map-card-location">📍 <c:out value="${m.location}"/></div>
+                            </c:if>
+                            <c:forEach var="gm" items="${m.gamemodesKr}">
+                              <span class="map-mode-badge">${gm}</span>
+                            </c:forEach>
+                          </div>
+                        </div>
+                      </c:if>
+                    </c:forEach>
+                  </div>
                 </div>
-              </c:otherwise>
-            </c:choose>
-            <div class="map-card-body">
-              <div class="map-card-name"><c:out value="${m.nameKr}"/></div>
-              <c:if test="${not empty m.location}">
-                <div class="map-card-location">📍 <c:out value="${m.location}"/></div>
-              </c:if>
-              <c:forEach var="gm" items="${m.gamemodesKr}">
-                <span class="map-mode-badge">${gm}</span>
-              </c:forEach>
+              </div>
             </div>
-          </div>
+          </c:if>
         </c:forEach>
       </div>
 
     </c:otherwise>
   </c:choose>
 </div>
-
-<script>
-(function () {
-  var btns  = document.querySelectorAll('.gamemode-btn');
-  var cards = document.querySelectorAll('.map-card');
-
-  btns.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      btns.forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      var mode = btn.getAttribute('data-mode');
-      cards.forEach(function (card) {
-        if (mode === 'all') {
-          card.style.display = '';
-        } else {
-          var modes = card.getAttribute('data-modes') || '';
-          card.style.display = modes.indexOf(mode) !== -1 ? '' : 'none';
-        }
-      });
-    });
-  });
-})();
-</script>
 
 <jsp:include page="/WEB-INF/jsp/common/footer.jsp" />

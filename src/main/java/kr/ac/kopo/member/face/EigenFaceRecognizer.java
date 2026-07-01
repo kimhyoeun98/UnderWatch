@@ -39,10 +39,18 @@ public class EigenFaceRecognizer {
 
 	/**
 	 * 등록된 얼굴이 1명뿐이라 PCA 모델을 만들 수 없을 때(소표본) 사용하는 폴백 임계값.
-	 * 이때는 고유공간 투영 대신 정규화 픽셀 벡터(0~1, 길이 DIM)를 그대로 비교한다.
-	 * 픽셀 공간 유클리드 거리는 스케일이 달라 별도 임계값을 둔다(콘솔 dist 로그로 조정).
+	 * 이때는 고유공간 투영 대신 정규화 픽셀 벡터를 ZNCC(평균 제거 정규화 상관)로 비교한다.
+	 * 거리 = 1 - 상관계수 이므로, 상관 0.85 이상만 같은 사람으로 인정 → 임계값 0.15.
+	 * 남의 얼굴이 통과하면 더 작게(예: 0.10), 본인이 자꾸 거부되면 더 크게 조정한다.
+	 * 콘솔의 [FaceLogin/RAW] dist 로그(= 1 - 상관)를 보고 튜닝한다.
 	 */
-	public static final double RAW_MATCH_THRESHOLD = 12.0;
+	public static final double RAW_MATCH_THRESHOLD = 0.15;
+
+	/**
+	 * 전처리 시 프레임 중앙에서 잘라낼 정사각형 비율(짧은 변 기준). 얼굴은 보통 중앙에
+	 * 오므로 배경을 제거해 인식 정확도를 높인다. JSP 가이드 박스(중앙 점선)와 맞춘다.
+	 */
+	public static final double CENTER_CROP_RATIO = 0.66;
 
 	/** 학습된 PCA 모델: 평균 얼굴 + 고유얼굴(정규화 K개) */
 	public static class Model {
@@ -188,6 +196,31 @@ public class EigenFaceRecognizer {
 		return scale(face);
 	}
 
+	/**
+	 * raw 픽셀 벡터 전용 거리 = 1 - ZNCC(평균 제거 정규화 상관계수).
+	 * 각 벡터에서 평균을 빼고 크기를 정규화한 뒤 내적하므로, 밝기/대비 차이에 강하다.
+	 * 같을수록 0에 가깝고(상관 1), 다를수록 1 이상. 길이가 다르면 무한대.
+	 */
+	public double rawDistance(double[] a, double[] b) {
+		if (a == null || b == null || a.length != b.length) {
+			return Double.MAX_VALUE;
+		}
+		int n = a.length;
+		double ma = 0, mb = 0;
+		for (int i = 0; i < n; i++) { ma += a[i]; mb += b[i]; }
+		ma /= n; mb /= n;
+		double num = 0, da = 0, db = 0;
+		for (int i = 0; i < n; i++) {
+			double x = a[i] - ma, y = b[i] - mb;
+			num += x * y; da += x * x; db += y * y;
+		}
+		double denom = Math.sqrt(da * db);
+		if (denom < 1e-12) {
+			return Double.MAX_VALUE;
+		}
+		return 1.0 - (num / denom);
+	}
+
 	/** 두 가중치 벡터의 유클리드 거리. 길이가 다르면 무한대 */
 	public double distance(double[] a, double[] b) {
 		if (a == null || b == null || a.length != b.length) {
@@ -255,10 +288,17 @@ public class EigenFaceRecognizer {
 	// ===== 이미지 전처리 =====
 
 	private int[][] toGrayResized(BufferedImage src, int w, int h) {
+		// 프레임 중앙 정사각형만 잘라낸다(배경 제거 → 얼굴 위주 비교). 잘라낸 영역을 w×h로 축소.
+		int sw = src.getWidth(), sh = src.getHeight();
+		int side = (int) Math.round(Math.min(sw, sh) * CENTER_CROP_RATIO);
+		if (side < 1) side = Math.min(sw, sh);
+		int sx = (sw - side) / 2;
+		int sy = (sh - side) / 2;
+
 		BufferedImage dst = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
 		Graphics2D g = dst.createGraphics();
 		g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
-		g.drawImage(src, 0, 0, w, h, null);
+		g.drawImage(src, 0, 0, w, h, sx, sy, sx + side, sy + side, null);
 		g.dispose();
 
 		int[][] gray = new int[h][w];
