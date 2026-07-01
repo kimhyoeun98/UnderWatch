@@ -97,7 +97,7 @@ Spring Security 기본 로그인
 
 ### ✔ Face Login
 
-* Eigenfaces(PCA) 알고리즘 구현
+* Eigenfaces(PCA) 알고리즘 구현~~
 * 얼굴 특징 벡터 등록 (고유공간 투영)
 * 1:N 얼굴 비교
 * 아이디 입력 없이 로그인
