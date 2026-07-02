@@ -156,10 +156,10 @@
       <a href="${pageContext.request.contextPath}/message" style="text-decoration:none; color:#555; font-size:1.2rem;">&#8592;</a>
       <div class="msg-avatar" style="width:36px;height:36px;font-size:.85rem;">${fn:substring(partnerNickname, 0, 1)}</div>
       <span class="fw-semibold flex-grow-1"><c:out value="${partnerNickname}"/></span>
-      <form method="post" action="${pageContext.request.contextPath}/message/leave" style="margin:0">
+      <form id="leaveForm" method="post" action="${pageContext.request.contextPath}/message/leave" style="margin:0">
         <input type="hidden" name="partnerId" value="${partnerId}">
         <button type="submit" class="btn btn-outline-secondary btn-sm"
-                onclick="return confirm('대화방을 나가시겠습니까?\n(상대방의 대화 내용은 유지됩니다)')">
+                onclick="return leaveChat(this.form)">
           나가기
         </button>
       </form>
@@ -231,6 +231,31 @@
 </div>
 
 <script>
+var ctx = '${pageContext.request.contextPath}';
+var partnerId = '${partnerId}';
+
+// R-03 대화 나가기: 나가기 전에 신고 여부를 물어본다
+function leaveChat(form) {
+  if (!confirm('대화방을 나가시겠습니까?\n(상대방의 대화 내용은 유지됩니다)')) {
+    return false;
+  }
+  if (confirm('나가기 전에 이 대화를 신고하시겠습니까?')) {
+    var reason = prompt('신고 사유를 입력하세요 (선택)') || '';
+    var body = new URLSearchParams();
+    body.append('targetType', 'M');
+    body.append('partnerId', partnerId);
+    body.append('reason', reason);
+    // 신고 접수 후 대화방 나가기 (신고 실패해도 나가기는 진행)
+    fetch(ctx + '/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString()
+    }).then(function () { form.submit(); }, function () { form.submit(); });
+    return false;   // fetch 완료 후 직접 submit
+  }
+  return true;      // 신고 없이 바로 나가기
+}
+
 // 최하단 스크롤
 var chatEl = document.getElementById('chatMessages');
 if (chatEl) chatEl.scrollTop = chatEl.scrollHeight;

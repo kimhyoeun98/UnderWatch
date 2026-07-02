@@ -15,6 +15,10 @@
                  method="post" modelAttribute="boardVO" enctype="multipart/form-data">
 
         <form:hidden path="no" />
+        <%-- B-02 게스트 글 수정: 진입 시 확인한 비밀번호를 유지해 저장 시 재검증 --%>
+        <c:if test="${not empty guestPassword}">
+          <input type="hidden" name="guestPassword" value="${guestPassword}">
+        </c:if>
 
         <div class="mb-3">
           <label class="form-label">카테고리 <span class="text-danger">*</span></label>

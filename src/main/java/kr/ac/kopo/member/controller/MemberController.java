@@ -38,7 +38,7 @@ import kr.ac.kopo.member.vo.MemberVO;
 @Controller
 public class MemberController {
 
-	private static final String UPLOAD_DIR = "${user.home}/underwatch/uploads";
+	private static final String UPLOAD_DIR = "D:/Serv/ServM/uploads/";
 
 	@Autowired
 	private MemberService memberService;
@@ -59,9 +59,16 @@ public class MemberController {
 	 * 로그인폼
 	 * GET /member/login
 	 */
+	/** 정지 계정 안내에 노출할 관리자 문의 이메일(ow_member 의 admin 계정 이메일과 동일). */
+	private static final String ADMIN_CONTACT_EMAIL = "admin@underwatch.kr";
+
 	@GetMapping("/member/login")
 	public String loginForm(@RequestParam(name = "error", required = false) String error, Model model) {
-		if (error != null) {
+		if ("suspended".equals(error)) {
+			// 정지(SUSPENDED) 계정: 안내 문구 + 관리자 문의 이메일
+			model.addAttribute("errorMsg",
+				"계정이 일시 차단 중입니다. 관리자에게 문의해주세요. (" + ADMIN_CONTACT_EMAIL + ")");
+		} else if (error != null) {
 			model.addAttribute("errorMsg", "아이디 또는 비밀번호가 올바르지 않습니다.");
 		}
 		return "member/login";
@@ -140,20 +147,22 @@ public class MemberController {
 	@GetMapping("/member/mypage")
 	public String mypage(@AuthenticationPrincipal UserDetails userDetails, Model model) {
 		String id = userDetails.getUsername();
-		model.addAttribute("member", memberService.findById(id));
+
+		// M-08 등급: 점수 컬럼을 최신화한 뒤 저장된 값을 사용
+		memberService.recalcGrade(id);
+		MemberVO member = memberService.findById(id);
+		model.addAttribute("member", member);
 
 		List<BoardVO> myPosts = boardService.getMyPosts(id);
 		model.addAttribute("myPosts", myPosts);
 		model.addAttribute("myComments", commentService.getMyComments(id));
 
-		// M-08 등급: 글수*10 + 받은추천*5 + 받은조회*1
-		int postCnt = myPosts.size();
-		int likeSum = myPosts.stream().mapToInt(BoardVO::getLikeCnt).sum();
-		int viewSum = myPosts.stream().mapToInt(BoardVO::getViewCnt).sum();
-		int score = postCnt * 10 + likeSum * 5 + viewSum;
+		int score = member.getGradePoint();
 		model.addAttribute("gradeScore", score);
 		model.addAttribute("grade", gradeOf(score));
 		model.addAttribute("hasFace", memberService.hasFace(id));   // M-09
+		model.addAttribute("faceCount", memberService.faceCount(id));   // 등록된 얼굴 사진 수(0~3)
+		model.addAttribute("faceMax", 3);
 		return "member/mypage";
 	}
 
@@ -231,6 +240,31 @@ public class MemberController {
 	}
 
 	/**
+	 * M-10 계정 탈퇴 — 비밀번호 확인 후 탈퇴 처리(7일 보관 뒤 자동 삭제).
+	 * 성공 시 즉시 로그아웃(세션 무효화)하고 홈으로 이동.
+	 * POST /member/mypage/withdraw
+	 */
+	@PostMapping("/member/mypage/withdraw")
+	public String withdraw(@AuthenticationPrincipal UserDetails userDetails,
+						   @RequestParam("password") String password,
+						   HttpServletRequest request,
+						   RedirectAttributes ra) {
+		boolean ok = memberService.withdraw(userDetails.getUsername(), password);
+		if (!ok) {
+			ra.addFlashAttribute("withdrawError", "비밀번호가 올바르지 않아 탈퇴를 진행할 수 없습니다.");
+			return "redirect:/member/mypage";
+		}
+		// 로그아웃 처리: 세션 무효화 + 보안 컨텍스트 정리
+		SecurityContextHolder.clearContext();
+		HttpSession session = request.getSession(false);
+		if (session != null) {
+			session.invalidate();
+		}
+		ra.addFlashAttribute("globalMsg", "탈퇴가 접수되었습니다. 7일 이내 다시 로그인하지 않으면 계정이 영구 삭제됩니다.");
+		return "redirect:/";
+	}
+
+	/**
 	 * M-06 프로필 사진 업로드
 	 * POST /member/mypage/profile
 	 */
@@ -270,9 +304,12 @@ public class MemberController {
 			return Map.of("success", false, "message", "로그인이 필요합니다.");
 		}
 		boolean ok = memberService.saveFace(userDetails.getUsername(), image);
-		return ok
-				? Map.of("success", true, "message", "얼굴이 등록되었습니다.")
-				: Map.of("success", false, "message", "얼굴을 인식하지 못했습니다. 다시 시도해 주세요.");
+		if (!ok) {
+			return Map.of("success", false, "message", "얼굴을 인식하지 못했습니다. 다시 시도해 주세요.");
+		}
+		int count = memberService.faceCount(userDetails.getUsername());
+		return Map.of("success", true, "count", count,
+				"message", "얼굴이 등록되었습니다. (" + count + "/3장)");
 	}
 
 	/**

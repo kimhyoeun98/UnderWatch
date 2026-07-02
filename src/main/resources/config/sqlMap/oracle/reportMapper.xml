@@ -22,6 +22,13 @@
      ORDER BY CASE status WHEN 'PENDING' THEN 0 ELSE 1 END, no DESC
   </select>
 
+  <select id="selectByNo" parameterType="int" resultType="reportVO">
+    SELECT no, target_type, target_no, reporter_id, reason, status,
+           TO_CHAR(reg_date, 'yyyy-mm-dd hh24:mi') AS reg_date
+      FROM ow_report
+     WHERE no = #{no}
+  </select>
+
   <update id="updateStatus">
     UPDATE ow_report SET status = #{status} WHERE no = #{no}
   </update>

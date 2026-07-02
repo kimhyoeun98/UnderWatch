@@ -14,7 +14,8 @@
     SELECT id, password, nickname, name, phone, email, role,
            grade_point, profile_img, status,
            TO_CHAR(reg_date, 'yyyy-mm-dd') AS reg_date,
-           TO_CHAR(update_date, 'yyyy-mm-dd') AS update_date
+           TO_CHAR(update_date, 'yyyy-mm-dd') AS update_date,
+           TO_CHAR(withdraw_at, 'yyyy-mm-dd hh24:mi:ss') AS withdraw_at
       FROM ow_member
      WHERE id = #{id}
   </select>
@@ -63,6 +64,52 @@
     UPDATE ow_member SET role = #{role} WHERE id = #{id}
   </update>
 
+  <!-- M-08 등급 점수 컬럼 갱신: 글수*10 + 받은추천합*5 + 받은조회합*1 -->
+  <update id="recalcGradePoint" parameterType="string">
+    UPDATE ow_member
+       SET grade_point = (
+             NVL((SELECT COUNT(*)      FROM ow_board WHERE writer_id = #{id} AND is_deleted = 'N'), 0) * 10
+           + NVL((SELECT SUM(like_cnt) FROM ow_board WHERE writer_id = #{id} AND is_deleted = 'N'), 0) * 5
+           + NVL((SELECT SUM(view_cnt) FROM ow_board WHERE writer_id = #{id} AND is_deleted = 'N'), 0)
+           )
+     WHERE id = #{id}
+  </update>
+
+  <!-- M-10 계정 탈퇴: 7일 보관 상태로 표시 -->
+  <update id="requestWithdraw" parameterType="string">
+    UPDATE ow_member
+       SET status = 'WITHDRAWN', withdraw_at = SYSDATE
+     WHERE id = #{id}
+  </update>
+
+  <!-- M-10 탈퇴 철회: 다시 ACTIVE 로 복구 -->
+  <update id="cancelWithdraw" parameterType="string">
+    UPDATE ow_member
+       SET status = 'ACTIVE', withdraw_at = NULL
+     WHERE id = #{id} AND status = 'WITHDRAWN'
+  </update>
+
+  <!-- M-10 탈퇴 후 7일 경과 회원 id 목록 -->
+  <select id="selectExpiredWithdrawals" resultType="string">
+    SELECT id FROM ow_member
+     WHERE status = 'WITHDRAWN' AND withdraw_at + 7 &lt;= SYSDATE
+  </select>
+
+  <!-- M-10 회원 + 연관 데이터 일괄 삭제 (FK 안전 순서, PL/SQL 블록으로 원자적 처리) -->
+  <delete id="purgeMember" parameterType="string">
+    BEGIN
+      DELETE FROM ow_board_vote   WHERE member_id   = #{id};
+      DELETE FROM ow_comment_vote WHERE member_id   = #{id};
+      DELETE FROM ow_report       WHERE reporter_id = #{id};
+      DELETE FROM ow_message      WHERE sender_id   = #{id} OR receiver_id = #{id};
+      DELETE FROM ow_notification WHERE user_id     = #{id};
+      DELETE FROM ow_party        WHERE writer_id   = #{id};
+      DELETE FROM ow_comment      WHERE writer_id   = #{id};
+      DELETE FROM ow_board        WHERE writer_id   = #{id};
+      DELETE FROM ow_member       WHERE id          = #{id};
+    END;
+  </delete>
+
   <!-- M-06 프로필 사진 -->
   <update id="updateProfileImg">
     UPDATE ow_member SET profile_img = #{profileImg} WHERE id = #{id}
@@ -96,6 +143,10 @@
   </insert>
 
   <!-- M-09 얼굴 로그인 -->
+  <select id="selectFaceDescriptor" parameterType="string" resultType="string">
+    SELECT face_descriptor FROM ow_member WHERE id = #{id}
+  </select>
+
   <update id="updateFaceDescriptor">
     UPDATE ow_member SET face_descriptor = #{faceDescriptor} WHERE id = #{id}
   </update>

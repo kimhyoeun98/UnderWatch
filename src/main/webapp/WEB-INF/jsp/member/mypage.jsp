@@ -21,6 +21,9 @@
   <c:if test="${not empty infoError}">
     <div class="alert alert-danger">${infoError}</div>
   </c:if>
+  <c:if test="${not empty withdrawError}">
+    <div class="alert alert-danger">${withdrawError}</div>
+  </c:if>
 
   <!-- M-06 프로필 / M-08 등급 -->
   <div class="card shadow-sm mb-4">
@@ -56,13 +59,14 @@
     <div class="card-header d-flex align-items-center justify-content-between">
       <span class="ow-section-title">얼굴 로그인</span>
       <c:choose>
-        <c:when test="${hasFace}"><span class="badge bg-warning">등록됨</span></c:when>
+        <c:when test="${hasFace}"><span class="badge bg-warning">등록됨 ${faceCount}/${faceMax}</span></c:when>
         <c:otherwise><span class="badge bg-secondary">미등록</span></c:otherwise>
       </c:choose>
     </div>
     <div class="card-body">
       <p class="text-muted small mb-3">
         얼굴을 등록하면 로그인 화면에서 <b>아이디 없이 얼굴만으로</b> 로그인할 수 있습니다.
+        <b>여러 각도로 최대 ${faceMax}장</b>까지 등록하면 인식 정확도가 올라갑니다.
         카메라는 <b>http://localhost:8080</b> 접속 시에만 동작합니다.
       </p>
       <div id="faceSecureWarn" class="alert alert-danger d-none">
@@ -81,7 +85,11 @@
         <div class="col">
           <div id="faceStatus" class="small text-muted mb-2">카메라 준비 중...</div>
           <button id="faceRegBtn" class="btn btn-warning" disabled>
-            ${hasFace ? '얼굴 다시 등록' : '얼굴 등록'}
+            <c:choose>
+              <c:when test="${faceCount == 0}">얼굴 등록</c:when>
+              <c:when test="${faceCount < faceMax}">얼굴 추가 등록 (${faceCount}/${faceMax})</c:when>
+              <c:otherwise>얼굴 갱신 (가장 오래된 1장 대체)</c:otherwise>
+            </c:choose>
           </button>
         </div>
       </div>
@@ -192,6 +200,28 @@
     </div>
 
   </div>
+
+  <!-- M-10 계정 탈퇴 -->
+  <div class="card shadow-sm mt-4 border-danger">
+    <div class="card-header"><span class="ow-section-title text-danger">계정 탈퇴</span></div>
+    <div class="card-body">
+      <p class="text-muted small mb-3">
+        탈퇴를 진행하면 계정이 <b>7일간 보관</b>된 뒤 영구 삭제됩니다.
+        보관 기간 동안에 로그인 할 시 탈퇴 진행은 취소됩니다.
+      </p>
+      <form method="post" action="${pageContext.request.contextPath}/member/mypage/withdraw"
+            class="row g-2 align-items-end" style="max-width:480px"
+            onsubmit="return confirm('정말 탈퇴하시겠습니까?\n7일 후 계정과 작성 내역이 영구 삭제됩니다.');">
+        <div class="col-sm-7">
+          <label class="form-label small">비밀번호 확인</label>
+          <input type="password" name="password" class="form-control" placeholder="현재 비밀번호" required>
+        </div>
+        <div class="col-sm-5">
+          <button type="submit" class="btn btn-danger w-100">탈퇴하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 <!-- M-09 얼굴 등록 스크립트 (외부 라이브러리 없이 웹캠 캡처 → 서버 LBPH 분석) -->
@@ -247,6 +277,8 @@
     .then(function (res) {
       setStatus(res.message || (res.success ? '등록 완료' : '등록 실패'));
       btn.disabled = false;
+      // 등록 성공 시 등록 수/버튼 라벨을 갱신하기 위해 잠시 후 새로고침
+      if (res.success) { setTimeout(function () { location.reload(); }, 900); }
     })
     .catch(function (err) {
       setStatus('오류: ' + err.message);

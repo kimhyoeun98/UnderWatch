@@ -35,6 +35,9 @@ public class MemberVO {
 	private String regDate;
 	private String updateDate;
 
+	// M-10 탈퇴 신청 시각(yyyy-MM-dd HH:mm:ss). 미탈퇴면 null. 재로그인 복구 7일 판정에 사용
+	private String withdrawAt;
+
 	// M-03 소셜 로그인 (google / kakao / naver, 일반가입은 null)
 	private String provider;
 	private String providerId;
@@ -136,6 +139,14 @@ public class MemberVO {
 
 	public void setUpdateDate(String updateDate) {
 		this.updateDate = updateDate;
+	}
+
+	public String getWithdrawAt() {
+		return withdrawAt;
+	}
+
+	public void setWithdrawAt(String withdrawAt) {
+		this.withdrawAt = withdrawAt;
 	}
 
 	public String getProvider() {

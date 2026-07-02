@@ -11,12 +11,19 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import kr.ac.kopo.board.service.BoardService;
 import kr.ac.kopo.board.vo.BoardCategoryVO;
 import kr.ac.kopo.board.vo.SearchVO;
 import kr.ac.kopo.comment.service.CommentService;
+import kr.ac.kopo.board.vo.BoardVO;
 import kr.ac.kopo.member.service.MemberService;
+import kr.ac.kopo.message.service.MessageService;
+import kr.ac.kopo.notification.service.NotificationService;
 import kr.ac.kopo.report.service.ReportService;
+import kr.ac.kopo.report.vo.ReportVO;
 import kr.ac.kopo.visit.service.VisitService;
 
 /**
@@ -38,7 +45,13 @@ public class AdminController {
 	private ReportService reportService;
 
 	@Autowired
+	private MessageService messageService;
+
+	@Autowired
 	private VisitService visitService;
+
+	@Autowired
+	private NotificationService notificationService;
 
 	/**
 	 * 대시보드
@@ -78,6 +91,10 @@ public class AdminController {
 			return "redirect:/admin/members";
 		}
 		memberService.changeStatus(id, status);
+		// M-11 차단 알림: 정지 처리 시 대상자에게 알림
+		if ("SUSPENDED".equals(status)) {
+			notificationService.notify(id, "회원님의 계정이 관리자에 의해 정지되었습니다.", "/member/mypage");
+		}
 		return "redirect:/admin/members";
 	}
 
@@ -160,13 +177,69 @@ public class AdminController {
 	public String blind(@RequestParam("no") int no,
 						@RequestParam("targetType") String targetType,
 						@RequestParam("targetNo") int targetNo) {
+		// M-11 차단 알림: 블라인드 전에 콘텐츠 작성자를 파악해 알림
+		String ownerId;
+		String link;
 		if ("B".equals(targetType)) {
+			BoardVO board = boardService.getDetail(targetNo);
+			ownerId = (board == null) ? null : board.getWriterId();
+			link = "/board/detail?no=" + targetNo;
 			boardService.delete(targetNo);     // 게시글 논리삭제
 		} else {
+			ownerId = commentService.getWriterId(targetNo);
+			link = "/notification";
 			commentService.blind(targetNo);    // 댓글 논리삭제
+		}
+		if (ownerId != null) {
+			notificationService.notify(ownerId,
+				"신고 처리로 회원님의 " + ("B".equals(targetType) ? "게시글" : "댓글") + "이 블라인드 처리되었습니다.",
+				link);
 		}
 		reportService.resolve(no);
 		return "redirect:/admin/reports";
+	}
+
+	/**
+	 * A-03 신고 단순 종결(블라인드 없이) — 쪽지 신고 등 콘텐츠 삭제가 불가한 경우
+	 * POST /admin/reports/resolve
+	 */
+	@PostMapping("/admin/reports/resolve")
+	public String resolveReport(@RequestParam("no") int no) {
+		reportService.resolve(no);
+		return "redirect:/admin/reports";
+	}
+
+	/**
+	 * R-03 쪽지 신고 대화 내용 조회. 신고 사유에 기록된 상대 아이디를 파싱해
+	 * 신고자와 상대 간 전체 대화(삭제 여부 무관)를 관리자에게 보여준다.
+	 * GET /admin/reports/message?no={reportNo}
+	 */
+	@GetMapping("/admin/reports/message")
+	public String reportMessage(@RequestParam("no") int no, Model model, RedirectAttributes ra) {
+		ReportVO report = reportService.getReport(no);
+		if (report == null || !"M".equals(report.getTargetType())) {
+			ra.addFlashAttribute("reportMsg", "쪽지 신고가 아니거나 존재하지 않는 신고입니다.");
+			return "redirect:/admin/reports";
+		}
+		String partnerId = extractPartnerId(report.getReason());
+		if (partnerId == null) {
+			ra.addFlashAttribute("reportMsg", "신고에서 상대 아이디를 찾을 수 없습니다.");
+			return "redirect:/admin/reports";
+		}
+		model.addAttribute("report", report);
+		model.addAttribute("reporterId", report.getReporterId());
+		model.addAttribute("partnerId", partnerId);
+		model.addAttribute("messages", messageService.getThreadForAdmin(report.getReporterId(), partnerId));
+		return "admin/reportMessage";
+	}
+
+	/** 신고 사유의 "[쪽지 상대: id] ..." 패턴에서 상대 아이디를 추출한다. */
+	private String extractPartnerId(String reason) {
+		if (reason == null) {
+			return null;
+		}
+		Matcher m = Pattern.compile("\\[쪽지 상대: ([^\\]]+)\\]").matcher(reason);
+		return m.find() ? m.group(1).trim() : null;
 	}
 
 	/**

@@ -57,4 +57,34 @@ public class CommentServiceImpl implements CommentService {
 	public void blind(int no) {
 		commentDAO.delete(no);
 	}
+
+	@Override
+	public String getWriterId(int no) {
+		CommentVO c = commentDAO.selectOne(no);
+		return c == null ? null : c.getWriterId();
+	}
+
+	@Override
+	public void vote(int commentNo, String memberId, String type) {
+		String current = commentDAO.getVoteType(memberId, commentNo);
+		if (current == null) {
+			commentDAO.insertVote(memberId, commentNo, type);
+			adjustCount(commentNo, type, +1);
+		} else if (current.equals(type)) {
+			commentDAO.deleteVote(memberId, commentNo);   // 같은 버튼 → 취소
+			adjustCount(commentNo, type, -1);
+		} else {
+			commentDAO.updateVote(memberId, commentNo, type);   // 반대 버튼 → 전환
+			adjustCount(commentNo, current, -1);
+			adjustCount(commentNo, type, +1);
+		}
+	}
+
+	private void adjustCount(int commentNo, String type, int delta) {
+		if ("L".equals(type)) {
+			if (delta > 0) commentDAO.increaseLike(commentNo); else commentDAO.decreaseLike(commentNo);
+		} else {
+			if (delta > 0) commentDAO.increaseDislike(commentNo); else commentDAO.decreaseDislike(commentNo);
+		}
+	}
 }

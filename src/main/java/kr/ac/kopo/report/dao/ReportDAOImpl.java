@@ -37,6 +37,11 @@ public class ReportDAOImpl implements ReportDAO {
 	}
 
 	@Override
+	public ReportVO selectByNo(int no) {
+		return sqlSessionTemplate.selectOne("report.dao.ReportDAO.selectByNo", no);
+	}
+
+	@Override
 	public void updateStatus(int no, String status) {
 		Map<String, Object> p = new HashMap<>();
 		p.put("no", no);

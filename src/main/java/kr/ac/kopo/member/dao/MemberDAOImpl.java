@@ -75,6 +75,33 @@ public class MemberDAOImpl implements MemberDAO {
 		sqlSessionTemplate.update("member.dao.MemberDAO.updateRole", p);
 	}
 
+	// M-08 등급 점수 재계산
+	@Override
+	public void recalcGradePoint(String id) {
+		sqlSessionTemplate.update("member.dao.MemberDAO.recalcGradePoint", id);
+	}
+
+	// M-10 계정 탈퇴
+	@Override
+	public void requestWithdraw(String id) {
+		sqlSessionTemplate.update("member.dao.MemberDAO.requestWithdraw", id);
+	}
+
+	@Override
+	public void cancelWithdraw(String id) {
+		sqlSessionTemplate.update("member.dao.MemberDAO.cancelWithdraw", id);
+	}
+
+	@Override
+	public List<String> selectExpiredWithdrawals() {
+		return sqlSessionTemplate.selectList("member.dao.MemberDAO.selectExpiredWithdrawals");
+	}
+
+	@Override
+	public void purgeMember(String id) {
+		sqlSessionTemplate.delete("member.dao.MemberDAO.purgeMember", id);
+	}
+
 	@Override
 	public void updateProfileImg(String id, String profileImg) {
 		Map<String, Object> p = new HashMap<>();
@@ -115,6 +142,11 @@ public class MemberDAOImpl implements MemberDAO {
 		p.put("id", id);
 		p.put("faceDescriptor", faceDescriptor);
 		sqlSessionTemplate.update("member.dao.MemberDAO.updateFaceDescriptor", p);
+	}
+
+	@Override
+	public String selectFaceDescriptor(String id) {
+		return sqlSessionTemplate.selectOne("member.dao.MemberDAO.selectFaceDescriptor", id);
 	}
 
 	@Override

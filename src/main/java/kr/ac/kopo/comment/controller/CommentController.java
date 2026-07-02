@@ -41,9 +41,10 @@ public class CommentController {
 		comment.setContent(content);
 		commentService.write(comment);
 
-		// R-02 알림: 글 작성자에게 (본인 댓글이면 생략)
+		// R-02 알림: 글 작성자에게 (본인 댓글이거나 비로그인 게스트 글이면 생략)
 		BoardVO board = boardService.getDetail(boardNo);
-		if (board != null && !board.getWriterId().equals(userDetails.getUsername())) {
+		if (board != null && board.getWriterId() != null
+				&& !board.getWriterId().equals(userDetails.getUsername())) {
 			notificationService.notify(board.getWriterId(),
 				userDetails.getUsername() + "님이 회원님의 글에 댓글을 남겼습니다.",
 				"/board/detail?no=" + boardNo);
@@ -61,5 +62,29 @@ public class CommentController {
 						 @RequestParam("boardNo") int boardNo) {
 		commentService.delete(no, userDetails.getUsername());
 		return "redirect:/board/detail?no=" + boardNo;
+	}
+
+	/**
+	 * I-03 댓글 추천
+	 * POST /comment/like
+	 */
+	@PostMapping("/comment/like")
+	public String like(@AuthenticationPrincipal UserDetails userDetails,
+					   @RequestParam("no") int no,
+					   @RequestParam("boardNo") int boardNo) {
+		commentService.vote(no, userDetails.getUsername(), "L");
+		return "redirect:/board/detail?no=" + boardNo + "#comment-" + no;
+	}
+
+	/**
+	 * I-03 댓글 비추천
+	 * POST /comment/dislike
+	 */
+	@PostMapping("/comment/dislike")
+	public String dislike(@AuthenticationPrincipal UserDetails userDetails,
+						 @RequestParam("no") int no,
+						 @RequestParam("boardNo") int boardNo) {
+		commentService.vote(no, userDetails.getUsername(), "D");
+		return "redirect:/board/detail?no=" + boardNo + "#comment-" + no;
 	}
 }

@@ -9,5 +9,6 @@ public interface ReportDAO {
 	int existsReport(String targetType, int targetNo, String reporterId);
 	void insert(ReportVO report);
 	List<ReportVO> selectAll();
+	ReportVO selectByNo(int no);
 	void updateStatus(int no, String status);
 }

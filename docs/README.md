@@ -16,6 +16,8 @@
 * Spring MVC 기반 커뮤니티 서비스 구현
 * Spring Security를 이용한 인증 및 권한 관리
 * 폼 / OAuth2 / 얼굴 인식 로그인 통합
+* 비회원 게시글, 댓글 추천/비추천, 실시간 알림 등 커뮤니티 운영 기능 구현
+* 탈퇴 7일 유예, 신고 처리 쪽지 발송 등 사용자 관리 흐름 구현
 * OverFast API · Blizzard 패치노트를 활용한 게임 정보(영웅 · 맵 · 패치) 제공
 * 관리자 기능 및 운영 기능 구현
 
@@ -78,6 +80,8 @@
 * 마이페이지
 * 프로필 이미지 업로드
 * 활동 점수 및 등급 시스템
+* 회원 탈퇴 신청, 7일 유예, 로그인 시 복구
+* 탈퇴 7일 경과 회원 자동 삭제 스케줄러
 
 ---
 
@@ -97,9 +101,9 @@ Spring Security 기본 로그인
 
 ### ✔ Face Login
 
-* Eigenfaces(PCA) 알고리즘 구현~~
-* 얼굴 특징 벡터 등록 (고유공간 투영)
-* 1:N 얼굴 비교
+* Python 얼굴 API(InsightFace/ArcFace 임베딩) 연동
+* 회원당 최대 3개 얼굴 임베딩 등록
+* 코사인 유사도 기반 1:N 얼굴 비교
 * 아이디 입력 없이 로그인
 
 ---
@@ -107,11 +111,13 @@ Spring Security 기본 로그인
 ## 게시판
 
 * 게시글 CRUD
+* 비로그인(게스트) 게시글 작성 / 비밀번호 검증 기반 수정·삭제
 * 카테고리
 * 검색
 * 추천 / 비추천
 * 이미지 업로드
 * 댓글 / 대댓글
+* 댓글 추천 / 비추천
 * 신고 기능
 
 ---
@@ -121,6 +127,7 @@ Spring Security 기본 로그인
 * 구인구직
 * 쪽지
 * 알림
+* WebSocket 기반 안 읽은 쪽지 / 알림 배지 실시간 갱신
 
 ---
 
@@ -138,6 +145,7 @@ OverFast API + Blizzard 패치노트 연동
 
 * 회원 관리
 * 신고 관리
+* 신고 처리 결과 쪽지 발송
 * 카테고리 관리
 * 방문 통계
 * 대시보드
@@ -165,16 +173,16 @@ Face Login
 ```
 웹캠 (브라우저에서 이미지 캡처)
 ↓
-Server — 얼굴 정규화 (64×64)
+Spring Server
 ↓
-PCA 학습 (평균·고유얼굴 공간) 
+Python Face API — 얼굴 검출 + 512차원 임베딩
 ↓
-고유공간 투영 후 1:N 최근접 비교
+DB에 저장된 임베딩들과 1:N 코사인 비교
 ↓
 로그인
 ```
 
-브라우저는 얼굴 이미지만 전송하고, 특징 추출·비교는 모두 서버에서 처리합니다.
+브라우저는 얼굴 이미지만 전송하고, 특징 추출은 Python 얼굴 API가, 비교와 로그인 처리는 Spring 서버가 담당합니다.
 등록된 모든 얼굴과 비교하여 가장 가까운 사용자를 찾는 방식으로 로그인합니다.
 
 ---
@@ -186,6 +194,16 @@ PCA 학습 (평균·고유얼굴 공간)
 * 영웅: 목록(역할별) · 상세 — 한국어(`locale=ko-kr`)
 * 맵: 목록 — 맵 이름 · 게임 모드 한글 보강
 * 패치 노트: 공식 페이지를 파싱해 제목 · 날짜 · **원문 링크** · 썸네일 제공
+
+---
+
+## 4. 운영성 기능 보강
+
+* 게스트 게시글은 작성자 이름과 BCrypt 해시 비밀번호를 저장하고, 수정/삭제 시 비밀번호를 재검증합니다.
+* 댓글 추천/비추천은 `ow_comment_vote` 복합 PK로 회원당 댓글 1표만 허용합니다.
+* 탈퇴 신청 회원은 `WITHDRAWN` 상태로 7일 보관하고, 기간 안에 로그인하면 `ACTIVE`로 복구합니다.
+* `WithdrawScheduler`가 매일 새벽 4시에 7일 경과 탈퇴 대기 회원을 실제 삭제합니다.
+* 쪽지와 알림은 저장 후 `NotifyWebSocketHandler`를 통해 접속 중인 사용자 탭에 배지 카운트를 푸시합니다.
 
 ---
 
@@ -266,7 +284,8 @@ PCA 학습 (평균·고유얼굴 공간)
 | Build            | Maven             |
 | Server           | Tomcat 11         |
 | External API     | OverFast API · Blizzard 패치노트 |
-| Face Recognition | Eigenfaces/PCA  |
+| Face Recognition | InsightFace/ArcFace API + cosine matching |
+| Realtime         | Spring WebSocket  |
 
 ---
 
@@ -312,6 +331,7 @@ src
  ├── party         # 구인구직
  ├── message       # 쪽지
  ├── notification  # 알림
+ ├── realtime      # WebSocket 실시간 배지
  ├── report        # 신고
  ├── visit         # 방문 집계
  ├── game          # 게임 정보(영웅·맵·패치노트)
@@ -327,7 +347,8 @@ src
 
 ```bash
 sqlplus hr/hr@localhost:1521/xe @src/main/resources/sql/schema.sql
-# add_oauth.sql, add_face.sql 등 마이그레이션도 함께 적용
+# add_oauth.sql, add_face.sql, add_comment_vote.sql,
+# add_guest_board.sql, add_withdraw.sql 등 마이그레이션도 함께 적용
 ```
 
 ### 2. OAuth Key 입력
@@ -363,8 +384,9 @@ http://underwatch.local:8080
 | --- | --- |
 | [docs/Architecture.md](docs/Architecture.md) | 전체 구조·요청 흐름·단일 컨텍스트·레이어 |
 | [docs/OAuth.md](docs/OAuth.md) | 카카오·네이버·구글 소셜 로그인 구현 |
-| [docs/FaceLogin.md](docs/FaceLogin.md) | Eigenfaces(PCA) 1:N 얼굴 로그인 |
+| [docs/FaceLogin.md](docs/FaceLogin.md) | 얼굴 API 연동과 1:N 얼굴 로그인 |
 | [docs/Database.md](docs/Database.md) | 테이블 스키마·마이그레이션·ERD |
+| [docs/ERD.md](docs/ERD.md) | 현재 코드 기준 Mermaid ERD |
 | [docs/DevelopmentStory.md](docs/DevelopmentStory.md) | 개발하며 겪은 문제와 해결 상세 |
 
 ---
@@ -376,7 +398,7 @@ http://underwatch.local:8080
 * 얼굴 라이브니스 검출
 * OAuth Secret 관리 개선
 * API 캐싱 적용
-* Redis 기반 알림 기능 개선
+* Redis 기반 WebSocket 세션 공유
 
 ---
 

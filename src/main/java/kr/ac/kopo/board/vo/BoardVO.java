@@ -27,6 +27,8 @@ public class BoardVO {
 	private String updateDate;
 	private String imageStored;   // B-04 저장 파일명
 	private String imageOrig;     // B-04 원본 파일명
+	private String guestName;     // B-02 비로그인 작성자 표시 이름
+	private String guestPassword; // B-02 비로그인 작성자 비밀번호(BCrypt 해시)
 
 	public int getNo() {
 		return no;
@@ -154,5 +156,21 @@ public class BoardVO {
 
 	public void setImageOrig(String imageOrig) {
 		this.imageOrig = imageOrig;
+	}
+
+	public String getGuestName() {
+		return guestName;
+	}
+
+	public void setGuestName(String guestName) {
+		this.guestName = guestName;
+	}
+
+	public String getGuestPassword() {
+		return guestPassword;
+	}
+
+	public void setGuestPassword(String guestPassword) {
+		this.guestPassword = guestPassword;
 	}
 }

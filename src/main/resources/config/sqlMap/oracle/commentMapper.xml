@@ -8,6 +8,7 @@
   <select id="selectByBoardNo" parameterType="int" resultType="commentVO">
     SELECT c.no, c.board_no, c.writer_id, m.nickname AS writer_nickname,
            c.parent_no, c.content, c.is_deleted,
+           NVL(c.like_cnt, 0) AS like_cnt, NVL(c.dislike_cnt, 0) AS dislike_cnt,
            TO_CHAR(c.reg_date, 'yyyy-mm-dd hh24:mi') AS reg_date
       FROM ow_comment c
       JOIN ow_member m ON c.writer_id = m.id
@@ -44,5 +45,39 @@
      WHERE c.writer_id = #{writerId} AND c.is_deleted = 'N'
      ORDER BY c.no DESC
   </select>
+
+  <!-- I-03 댓글 추천/비추천 (토글) -->
+  <select id="getVoteType" resultType="string">
+    SELECT vote_type FROM ow_comment_vote
+     WHERE member_id = #{memberId} AND comment_no = #{commentNo}
+  </select>
+
+  <insert id="insertVote">
+    INSERT INTO ow_comment_vote(member_id, comment_no, vote_type)
+    VALUES(#{memberId}, #{commentNo}, #{type})
+  </insert>
+
+  <update id="updateVote">
+    UPDATE ow_comment_vote SET vote_type = #{type}, reg_date = SYSDATE
+     WHERE member_id = #{memberId} AND comment_no = #{commentNo}
+  </update>
+
+  <delete id="deleteVote">
+    DELETE FROM ow_comment_vote
+     WHERE member_id = #{memberId} AND comment_no = #{commentNo}
+  </delete>
+
+  <update id="increaseLike" parameterType="int">
+    UPDATE ow_comment SET like_cnt = NVL(like_cnt, 0) + 1 WHERE no = #{commentNo}
+  </update>
+  <update id="decreaseLike" parameterType="int">
+    UPDATE ow_comment SET like_cnt = GREATEST(NVL(like_cnt, 0) - 1, 0) WHERE no = #{commentNo}
+  </update>
+  <update id="increaseDislike" parameterType="int">
+    UPDATE ow_comment SET dislike_cnt = NVL(dislike_cnt, 0) + 1 WHERE no = #{commentNo}
+  </update>
+  <update id="decreaseDislike" parameterType="int">
+    UPDATE ow_comment SET dislike_cnt = GREATEST(NVL(dislike_cnt, 0) - 1, 0) WHERE no = #{commentNo}
+  </update>
 
 </mapper>

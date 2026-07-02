@@ -99,6 +99,11 @@ public class BoardServiceImpl implements BoardService {
 	}
 
 	@Override
+	public String getGuestPassword(int no) {
+		return boardDAO.selectGuestPassword(no);
+	}
+
+	@Override
 	public void updateImage(int no, String stored, String orig) {
 		boardDAO.updateImage(no, stored, orig);
 	}

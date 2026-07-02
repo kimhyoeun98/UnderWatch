@@ -113,6 +113,11 @@ public class BoardDAOImpl implements BoardDAO {
 	}
 
 	@Override
+	public String selectGuestPassword(int no) {
+		return sqlSessionTemplate.selectOne("board.dao.BoardDAO.selectGuestPassword", no);
+	}
+
+	@Override
 	public List<BoardVO> selectByWriter(String writerId) {
 		return sqlSessionTemplate.selectList("board.dao.BoardDAO.selectByWriter", writerId);
 	}

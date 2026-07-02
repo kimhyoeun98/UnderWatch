@@ -1,8 +1,10 @@
 package kr.ac.kopo.member.service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -99,6 +101,48 @@ public class MemberServiceImpl implements MemberService {
 	}
 
 	@Override
+	public void recalcGrade(String id) {
+		if (id != null) {
+			memberDAO.recalcGradePoint(id);
+		}
+	}
+
+	@Override
+	public boolean withdraw(String id, String rawPassword) {
+		MemberVO member = memberDAO.selectById(id);
+		if (member == null || member.getPassword() == null) {
+			return false;   // 소셜 전용 계정 등 비밀번호가 없으면 이 경로로는 탈퇴 불가
+		}
+		if (!passwordEncoder.matches(rawPassword, member.getPassword())) {
+			return false;   // 비밀번호 불일치
+		}
+		memberDAO.requestWithdraw(id);   // status=WITHDRAWN, withdraw_at=SYSDATE (7일 후 삭제 대상)
+		return true;
+	}
+
+	@Override
+	public void reactivateOnLogin(String id) {
+		// WITHDRAWN 상태에서만 복구된다(cancelWithdraw 의 WHERE 절이 상태를 확인).
+		// 7일 경과분은 MemberDetailsService 에서 로그인 자체가 막히므로 여기 도달하지 않는다.
+		memberDAO.cancelWithdraw(id);
+	}
+
+	@Override
+	public int purgeExpiredWithdrawals() {
+		int count = 0;
+		for (String id : memberDAO.selectExpiredWithdrawals()) {
+			try {
+				memberDAO.purgeMember(id);
+				count++;
+			} catch (Exception e) {
+				// 일부 회원 정리 실패해도 나머지는 계속 진행(다음 주기에 재시도)
+				System.out.println("[Withdraw] purge 실패: " + id + " - " + e.getMessage());
+			}
+		}
+		return count;
+	}
+
+	@Override
 	public void updateProfileImg(String id, String profileImg) {
 		memberDAO.updateProfileImg(id, profileImg);
 	}
@@ -120,9 +164,22 @@ public class MemberServiceImpl implements MemberService {
 
 	/**
 	 * 같은 사람으로 인정하는 최소 코사인 유사도. ArcFace(정규화 임베딩) 기준
-	 * 본인은 보통 0.5 이상, 남은 0.3 미만으로 나온다. 콘솔의 cos 로그를 보고 조정한다.
+	 * 본인은 보통 0.5 이상, 다른 사람은 0.3 미만으로 나온다. 그 사이(0.3~0.5)는
+	 * 닮은 사람이 걸리는 애매 구간이라, 오수락은 막으면서 본인 거절은 줄이도록
+	 * 기본값을 0.45 로 둔다. face.match.threshold 프로퍼티로 cos 로그를 보며 조정.
 	 */
-	private static final double COS_THRESHOLD = 0.38;
+	@Value("${face.match.threshold:0.45}")
+	private double cosThreshold;
+
+	/**
+	 * 1:N 매칭에서 1위와 2위 유사도의 최소 격차. 닮은 두 사람이 모두 임계값을 넘고
+	 * 점수마저 비슷하면(격차 &lt; margin) 누구인지 단정할 수 없으므로 거절한다.
+	 */
+	@Value("${face.match.margin:0.06}")
+	private double cosMargin;
+
+	/** 한 계정에 저장하는 얼굴 사진(임베딩) 최대 개수. 여러 각도를 저장해 인식률을 높인다. */
+	private static final int MAX_FACES = 3;
 
 	@Override
 	public boolean saveFace(String id, String imageData) {
@@ -130,7 +187,13 @@ public class MemberServiceImpl implements MemberService {
 		if (emb == null) {
 			return false; // 얼굴 미검출 또는 API 오류
 		}
-		memberDAO.updateFaceDescriptor(id, encode(emb));   // 임베딩 JSON 을 ow_member 에 저장
+		// 기존 임베딩에 이어붙이되 최대 MAX_FACES 장 유지(초과 시 가장 오래된 것부터 제거)
+		List<double[]> faces = decodeMulti(memberDAO.selectFaceDescriptor(id));
+		faces.add(emb);
+		while (faces.size() > MAX_FACES) {
+			faces.remove(0);
+		}
+		memberDAO.updateFaceDescriptor(id, encodeMulti(faces));
 		return true;
 	}
 
@@ -140,27 +203,53 @@ public class MemberServiceImpl implements MemberService {
 	}
 
 	@Override
+	public int faceCount(String id) {
+		return decodeMulti(memberDAO.selectFaceDescriptor(id)).size();
+	}
+
+	@Override
 	public String matchFace(String imageData) {
 		double[] probe = faceApi.embed(imageData);
 		if (probe == null) {
 			return null;
 		}
-		// 등록된 전 회원 임베딩과 1:N 코사인 유사도 비교 → 최고 유사도 회원 선택
+		// 등록된 전 회원과 1:N 비교. 회원마다 여러 장(최대 3) 등록될 수 있으므로
+		// 그 회원의 임베딩 중 최고 유사도를 그 회원의 점수로 삼는다 → 1위/2위 회원 추적
 		String bestId = null;
 		double bestCos = -1.0;
+		double secondCos = -1.0;
 		for (MemberVO m : memberDAO.selectAllFaces()) {
-			double[] v = decode(m.getFaceDescriptor());
-			if (v == null) {
+			double memberCos = -1.0;
+			for (double[] v : decodeMulti(m.getFaceDescriptor())) {
+				double cos = cosine(probe, v);
+				if (cos > memberCos) {
+					memberCos = cos;
+				}
+			}
+			if (memberCos < 0) {
 				continue;
 			}
-			double cos = cosine(probe, v);
-			if (cos > bestCos) {
-				bestCos = cos;
+			if (memberCos > bestCos) {
+				secondCos = bestCos;
+				bestCos = memberCos;
 				bestId = m.getId();
+			} else if (memberCos > secondCos) {
+				secondCos = memberCos;
 			}
 		}
-		System.out.println("[FaceLogin] best=" + bestId + " cos=" + bestCos);
-		return bestCos >= COS_THRESHOLD ? bestId : null;
+		System.out.println("[FaceLogin] best=" + bestId + " cos=" + bestCos + " second=" + secondCos
+				+ " (threshold=" + cosThreshold + ", margin=" + cosMargin + ")");
+
+		// ① 유사도가 임계값 미만이면 등록 안 된/다른 사람 → 거절
+		if (bestCos < cosThreshold) {
+			return null;
+		}
+		// ② 2위도 임계값을 넘고 1위와 격차가 작으면(닮은 사람이 함께 걸림) 단정 불가 → 거절
+		if (secondCos >= cosThreshold && (bestCos - secondCos) < cosMargin) {
+			System.out.println("[FaceLogin] 1·2위 격차 부족으로 거절: " + (bestCos - secondCos));
+			return null;
+		}
+		return bestId;
 	}
 
 	/** 정규화 임베딩 간 코사인 유사도(= 내적). 길이가 다르면 -1. */
@@ -201,5 +290,55 @@ public class MemberServiceImpl implements MemberService {
 		} catch (Exception e) {
 			return null;
 		}
+	}
+
+	/** List&lt;double[]&gt; → "[[..],[..]]" (임베딩 여러 장을 하나의 JSON 으로). */
+	private String encodeMulti(List<double[]> list) {
+		StringBuilder sb = new StringBuilder("[");
+		for (int i = 0; i < list.size(); i++) {
+			if (i > 0) sb.append(',');
+			sb.append(encode(list.get(i)));
+		}
+		return sb.append(']').toString();
+	}
+
+	/**
+	 * 저장된 얼굴 JSON 을 임베딩 목록으로 파싱.
+	 * 신규 형식 "[[..],[..]]" 은 여러 장, 구(舊) 단일 형식 "[..]" 은 한 장으로 호환 처리한다.
+	 */
+	private List<double[]> decodeMulti(String json) {
+		List<double[]> out = new ArrayList<>();
+		if (json == null) {
+			return out;
+		}
+		String s = json.trim();
+		if (s.length() < 2 || s.charAt(0) != '[') {
+			return out;
+		}
+		int i = 1;
+		while (i < s.length() && Character.isWhitespace(s.charAt(i))) i++;
+		if (i < s.length() && s.charAt(i) == '[') {
+			// 신규: 최상위 대괄호 안의 각 "[..]" 그룹을 하나의 임베딩으로 분리
+			int depth = 0, start = -1;
+			for (int k = 0; k < s.length(); k++) {
+				char c = s.charAt(k);
+				if (c == '[') {
+					if (depth == 1) start = k;
+					depth++;
+				} else if (c == ']') {
+					depth--;
+					if (depth == 1 && start >= 0) {
+						double[] e = decode(s.substring(start, k + 1));
+						if (e != null) out.add(e);
+						start = -1;
+					}
+				}
+			}
+		} else {
+			// 구 단일 형식
+			double[] e = decode(s);
+			if (e != null) out.add(e);
+		}
+		return out;
 	}
 }

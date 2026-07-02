@@ -2,14 +2,13 @@
 /target/
 /bin/
 
-# === 비밀 키 (실제 키는 로컬에만! oauth.properties.example 참고) ===
+# === 비밀 설정(실제 키는 로컬에만 보관, oauth.properties.example 참고) ===
 src/main/resources/oauth.properties
 
-# === 로그 / 임시 ===
+# === 로그 / 임시 파일 ===
 *.log
 *.tmp
 
 # === OS / 에디터 ===
 .DS_Store
 Thumbs.db
-/.settings

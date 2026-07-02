@@ -38,10 +38,11 @@
     <security:intercept-url pattern="/board/list" access="permitAll" />
     <security:intercept-url pattern="/board/detail" access="permitAll" />
 
-    <!-- 글 작성·수정·삭제는 로그인 필요 -->
-    <security:intercept-url pattern="/board/write" access="isAuthenticated()" />
-    <security:intercept-url pattern="/board/edit" access="isAuthenticated()" />
-    <security:intercept-url pattern="/board/delete" access="isAuthenticated()" />
+    <!-- B-02 일반 게시판은 비로그인 작성·수정·삭제 허용(게스트 비밀번호로 본인 확인).
+         공지 카테고리/추천 등은 컨트롤러·아래 규칙에서 별도 제한 -->
+    <security:intercept-url pattern="/board/write" access="permitAll" />
+    <security:intercept-url pattern="/board/edit" access="permitAll" />
+    <security:intercept-url pattern="/board/delete" access="permitAll" />
     <security:intercept-url pattern="/board/like" access="isAuthenticated()" />
     <security:intercept-url pattern="/board/dislike" access="isAuthenticated()" />
     <security:intercept-url pattern="/report" access="isAuthenticated()" />
@@ -50,6 +51,9 @@
     <security:intercept-url pattern="/message/**" access="isAuthenticated()" />
     <security:intercept-url pattern="/notification/**" access="isAuthenticated()" />
     <security:intercept-url pattern="/comment/**" access="isAuthenticated()" />
+
+    <!-- 실시간 알림 WebSocket 핸드셰이크 (로그인 사용자만) -->
+    <security:intercept-url pattern="/ws/**" access="isAuthenticated()" />
 
     <!-- 마이페이지는 로그인 필요 -->
     <security:intercept-url pattern="/member/mypage/**" access="isAuthenticated()" />
@@ -60,12 +64,14 @@
     <!-- 나머지는 모두 허용 -->
     <security:intercept-url pattern="/**" access="permitAll" />
 
-    <!-- 폼 로그인 설정 -->
+    <!-- 폼 로그인 설정
+         - 성공: loginSuccessHandler(탈퇴 유예 재로그인 시 ACTIVE 복구)
+         - 실패: loginFailureHandler(정지 계정은 ?error=suspended 로 분기) -->
     <security:form-login
         login-page="/member/login"
         login-processing-url="/member/loginProc"
-        default-target-url="/"
-        authentication-failure-url="/member/login?error=true"
+        authentication-success-handler-ref="loginSuccessHandler"
+        authentication-failure-handler-ref="loginFailureHandler"
         username-parameter="id"
         password-parameter="password" />
 

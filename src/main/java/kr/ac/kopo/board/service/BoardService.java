@@ -20,6 +20,7 @@ public interface BoardService {
 	String getMyVote(int boardNo, String memberId);          // 'L'/'D'/null
 	List<BoardVO> getMyPosts(String writerId);               // M-05
 	void updateImage(int no, String stored, String orig);    // B-04
+	String getGuestPassword(int no);                         // B-02 비로그인 글 비밀번호 해시
 
 	// A-02 카테고리 관리
 	void addCategory(BoardCategoryVO category);

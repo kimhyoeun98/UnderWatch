@@ -17,7 +17,7 @@
 .rank-card .role { font-weight: 700; margin-bottom: 8px; }
 .rank-card img { width: 64px; height: 64px; object-fit: contain; }
 .rank-card .tier { font-weight: 700; text-transform: capitalize; margin-top: 6px; }
-.rank-card .none { color: #aaa; padding: 18px 0; }
+.rank-card .none { color: #777; padding: 18px 0; }
 
 /* 모드 토글 */
 .mode-toggle { display: inline-flex; background: #f0f0f3; border-radius: 999px; padding: 4px; gap: 4px; }
@@ -27,11 +27,11 @@
 
 .stat-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; }
 .stat-box { background: #fff; border: 1px solid #eee; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.06); }
-.stat-box .stat-label { font-size: .8rem; color: #888; margin-bottom: 4px; }
+.stat-box .stat-label { font-size: .8rem; color: #555; margin-bottom: 4px; }
 .stat-box .stat-value { font-size: 1.25rem; font-weight: 800; color: #f8a100; }
 
 /* 역할 범례 */
-.role-legend { display: flex; gap: 14px; font-size: .8rem; color: #777; }
+.role-legend { display: flex; gap: 14px; font-size: .8rem; color: #555; }
 .role-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .role-dot { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
 
@@ -41,7 +41,7 @@
 .hero-bar-track { grid-area: bar; height: 12px; background: #f0f0f3; border-radius: 6px; overflow: hidden; }
 .hero-bar-fill { height: 100%; border-radius: 6px; transition: width .25s; }
 .hero-val { grid-area: val; font-variant-numeric: tabular-nums; font-weight: 700; color: #333; min-width: 72px; text-align: right; }
-.hero-extra { grid-area: extra; font-size: .76rem; color: #999; }
+.hero-extra { grid-area: extra; font-size: .76rem; color: #555; }
 </style>
 
 <div class="container py-4">
@@ -55,7 +55,7 @@
              value="${battletag}" required>
       <button type="submit" class="btn btn-warning fw-bold">검색</button>
     </div>
-    <div class="form-text">대소문자를 정확히 입력하세요. 공개 프로필(설정 → 소셜 → career profile: 공개)만 조회됩니다.</div>
+    <div class="form-text" style="color:#3a3a4a;">대소문자를 정확히 입력하세요. 공개 프로필(설정 → 소셜 → career profile: 공개)만 조회됩니다.</div>
   </form>
 
   <c:if test="${not empty battletag}">
@@ -76,10 +76,7 @@
           <div>
             <div class="player-name"><c:out value="${summary.username}"/></div>
             <c:if test="${not empty summary.title}">
-              <div style="color:#bbb;"><c:out value="${summary.title}"/></div>
-            </c:if>
-            <c:if test="${not empty summary.endorsement.level}">
-              <div class="player-endorse">★ 인도 레벨 ${summary.endorsement.level}</div>
+              <div style="color:#e0e0ea;"><c:out value="${summary.title}"/></div>
             </c:if>
           </div>
         </div>

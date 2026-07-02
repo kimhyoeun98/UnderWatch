@@ -68,6 +68,14 @@ public class MessageDAOImpl implements MessageDAO {
 	}
 
 	@Override
+	public List<MessageVO> selectThreadForAdmin(String userA, String userB) {
+		Map<String, Object> p = new HashMap<>();
+		p.put("userA", userA);
+		p.put("userB", userB);
+		return sqlSessionTemplate.selectList("message.dao.MessageDAO.selectThreadForAdmin", p);
+	}
+
+	@Override
 	public void deleteForMe(int no, String myId) {
 		Map<String, Object> p = new HashMap<>();
 		p.put("no", no);

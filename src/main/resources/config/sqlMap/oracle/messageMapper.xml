@@ -80,6 +80,22 @@
      ORDER BY last_date DESC
   </select>
 
+  <!-- R-03 관리자 신고 검토용 대화 조회 (삭제 플래그 무시, 두 사람 전체 대화) -->
+  <select id="selectThreadForAdmin" resultType="messageVO">
+    SELECT m.no,
+           m.sender_id,
+           s.nickname AS sender_nickname,
+           m.receiver_id,
+           m.content,
+           m.is_read,
+           TO_CHAR(m.reg_date, 'yyyy-mm-dd hh24:mi') AS reg_date
+      FROM ow_message m
+      JOIN ow_member  s ON m.sender_id = s.id
+     WHERE (m.sender_id = #{userA} AND m.receiver_id = #{userB})
+        OR (m.sender_id = #{userB} AND m.receiver_id = #{userA})
+     ORDER BY m.no ASC
+  </select>
+
   <!-- 채팅 스레드 (내가 삭제한 메시지는 제외) -->
   <select id="selectThread" resultType="messageVO">
     SELECT m.no,

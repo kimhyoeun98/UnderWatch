@@ -25,12 +25,17 @@
               <c:forEach var="r" items="${reports}">
                 <tr>
                   <td>
-                    <span class="badge bg-secondary">${r.targetType == 'B' ? '게시글' : '댓글'}</span>
                     <c:choose>
                       <c:when test="${r.targetType == 'B'}">
+                        <span class="badge bg-secondary">게시글</span>
                         <a href="${pageContext.request.contextPath}/board/detail?no=${r.targetNo}" class="text-decoration-none">#${r.targetNo}</a>
                       </c:when>
-                      <c:otherwise>#${r.targetNo}</c:otherwise>
+                      <c:when test="${r.targetType == 'M'}">
+                        <span class="badge bg-info">쪽지</span>
+                      </c:when>
+                      <c:otherwise>
+                        <span class="badge bg-secondary">댓글</span> #${r.targetNo}
+                      </c:otherwise>
                     </c:choose>
                   </td>
                   <td>${r.reporterId}</td>
@@ -39,6 +44,18 @@
                   <td class="text-muted small">${r.regDate}</td>
                   <td>
                     <c:choose>
+                      <c:when test="${r.status == 'PENDING' and r.targetType == 'M'}">
+                        <%-- 쪽지 신고: 대화 내용 확인 + 종결 처리 --%>
+                        <div class="d-flex gap-1">
+                          <a href="${pageContext.request.contextPath}/admin/reports/message?no=${r.no}"
+                             class="btn btn-sm btn-outline-info">대화 보기</a>
+                          <form method="post" action="${pageContext.request.contextPath}/admin/reports/resolve"
+                                onsubmit="return confirm('이 신고를 처리 완료로 종결하시겠습니까?')">
+                            <input type="hidden" name="no" value="${r.no}">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">처리완료</button>
+                          </form>
+                        </div>
+                      </c:when>
                       <c:when test="${r.status == 'PENDING'}">
                         <form method="post" action="${pageContext.request.contextPath}/admin/reports/blind"
                               onsubmit="return confirm('블라인드 처리하시겠습니까?')">
@@ -48,7 +65,13 @@
                           <button type="submit" class="btn btn-sm btn-outline-danger">블라인드</button>
                         </form>
                       </c:when>
-                      <c:otherwise><span class="text-muted small">처리됨</span></c:otherwise>
+                      <c:otherwise>
+                        <c:if test="${r.targetType == 'M'}">
+                          <a href="${pageContext.request.contextPath}/admin/reports/message?no=${r.no}"
+                             class="btn btn-sm btn-outline-info">대화 보기</a>
+                        </c:if>
+                        <span class="text-muted small">처리됨</span>
+                      </c:otherwise>
                     </c:choose>
                   </td>
                 </tr>

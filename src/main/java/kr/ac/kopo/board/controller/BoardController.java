@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,6 +28,7 @@ import kr.ac.kopo.board.service.BoardService;
 import kr.ac.kopo.board.vo.BoardVO;
 import kr.ac.kopo.board.vo.SearchVO;
 import kr.ac.kopo.comment.service.CommentService;
+import kr.ac.kopo.member.service.MemberService;
 import kr.ac.kopo.notification.service.NotificationService;
 
 @Controller
@@ -43,6 +45,12 @@ public class BoardController {
 
 	@Autowired
 	private NotificationService notificationService;
+
+	@Autowired
+	private MemberService memberService;
+
+	@Autowired
+	private org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder passwordEncoder;
 
 	/**
 	 * 목록 (페이징 + 검색)
@@ -106,6 +114,8 @@ public class BoardController {
 						@Valid @ModelAttribute BoardVO boardVO,
 						BindingResult result,
 						@RequestParam(value = "imageFile", required = false) MultipartFile imageFile,
+						@RequestParam(value = "guestName", required = false) String guestName,
+						@RequestParam(value = "guestPassword", required = false) String guestPassword,
 						Model model) {
 		if (result.hasErrors()) {
 			model.addAttribute("categories", boardService.getCategories());
@@ -117,15 +127,32 @@ public class BoardController {
 			model.addAttribute("errorMsg", "공지사항은 관리자만 작성할 수 있습니다.");
 			return "board/write";
 		}
+		boolean guest = (userDetails == null);
+		// B-02: 비로그인 작성자는 표시 이름 + 비밀번호 필수
+		if (guest && (guestName == null || guestName.isBlank()
+				|| guestPassword == null || guestPassword.isBlank())) {
+			model.addAttribute("categories", boardService.getCategories());
+			model.addAttribute("errorMsg", "비로그인 작성 시 이름과 비밀번호를 입력하세요.");
+			return "board/write";
+		}
 		// B-04: 이미지 확장자 검증
 		if (hasFile(imageFile) && !isAllowedImage(imageFile)) {
 			model.addAttribute("categories", boardService.getCategories());
 			model.addAttribute("errorMsg", "이미지는 jpg, png 파일만 업로드할 수 있습니다.");
 			return "board/write";
 		}
-		boardVO.setWriterId(userDetails.getUsername());
+		if (guest) {
+			boardVO.setWriterId(null);
+			boardVO.setGuestName(guestName);
+			boardVO.setGuestPassword(passwordEncoder.encode(guestPassword));   // 해시 저장
+		} else {
+			boardVO.setWriterId(userDetails.getUsername());
+		}
 		boardService.write(boardVO);   // selectKey로 boardVO.no 채워짐
 		storeIfPresent(boardVO.getNo(), imageFile);
+		if (!guest) {
+			memberService.recalcGrade(boardVO.getWriterId());   // M-08 글 수 반영
+		}
 		return "redirect:/board/detail?no=" + boardVO.getNo();
 	}
 
@@ -135,11 +162,26 @@ public class BoardController {
 	 */
 	@GetMapping("/board/edit")
 	public String editForm(@RequestParam("no") int no,
+						   @RequestParam(value = "guestPassword", required = false) String guestPassword,
 						   @AuthenticationPrincipal UserDetails userDetails,
-						   Model model) {
+						   Model model,
+						   RedirectAttributes ra) {
 		BoardVO board = boardService.getDetail(no);
-		if (board == null || !board.getWriterId().equals(userDetails.getUsername())) {
-			return "redirect:/board/detail?no=" + no;
+		if (board == null) {
+			return "redirect:/board/list";
+		}
+		if (board.getWriterId() == null) {
+			// B-02 게스트 글: 비밀번호 확인 후 수정 폼 진입
+			if (!verifyGuest(no, guestPassword)) {
+				ra.addFlashAttribute("editError", "비밀번호가 올바르지 않습니다.");
+				return "redirect:/board/detail?no=" + no;
+			}
+			model.addAttribute("guestPassword", guestPassword);   // 폼 hidden 으로 전달(저장 시 재확인)
+		} else {
+			// 회원 글: 작성자 본인만
+			if (userDetails == null || !board.getWriterId().equals(userDetails.getUsername())) {
+				return "redirect:/board/detail?no=" + no;
+			}
 		}
 		model.addAttribute("boardVO", board);
 		model.addAttribute("categories", boardService.getCategories());
@@ -156,13 +198,21 @@ public class BoardController {
 					   BindingResult result,
 					   @RequestParam(value = "imageFile", required = false) MultipartFile imageFile,
 					   @RequestParam(value = "removeImage", required = false) String removeImage,
+					   @RequestParam(value = "guestPassword", required = false) String guestPassword,
 					   Model model) {
 		if (result.hasErrors()) {
 			model.addAttribute("categories", boardService.getCategories());
 			return "board/edit";
 		}
 		BoardVO original = boardService.getDetail(boardVO.getNo());
-		if (original == null || !original.getWriterId().equals(userDetails.getUsername())) {
+		if (original == null) {
+			return "redirect:/board/list";
+		}
+		// 권한 검증: 회원 글은 본인, 게스트 글은 비밀번호 일치
+		boolean allowed = (original.getWriterId() == null)
+				? verifyGuest(boardVO.getNo(), guestPassword)
+				: (userDetails != null && original.getWriterId().equals(userDetails.getUsername()));
+		if (!allowed) {
 			return "redirect:/board/detail?no=" + boardVO.getNo();
 		}
 		if (isAdminOnlyCategory(boardVO.getCategoryNo()) && !isAdmin(userDetails)) {
@@ -194,12 +244,29 @@ public class BoardController {
 	 */
 	@PostMapping("/board/delete")
 	public String delete(@RequestParam("no") int no,
+						 @RequestParam(value = "guestPassword", required = false) String guestPassword,
 						 @AuthenticationPrincipal UserDetails userDetails) {
 		BoardVO board = boardService.getDetail(no);
-		if (board != null && (board.getWriterId().equals(userDetails.getUsername()) || isAdmin(userDetails))) {
+		if (board == null) {
+			return "redirect:/board/list";
+		}
+		boolean allowed = (board.getWriterId() == null)
+				? (verifyGuest(no, guestPassword) || isAdmin(userDetails))   // B-02 게스트 글: 비밀번호 일치 또는 관리자
+				: (userDetails != null
+						&& (board.getWriterId().equals(userDetails.getUsername()) || isAdmin(userDetails)));
+		if (allowed) {
 			boardService.delete(no);
 		}
-		return "redirect:/board/list";
+		return "redirect:/board/detail?no=" + no;
+	}
+
+	/** B-02 게스트 글 비밀번호 검증 (해시 비교) */
+	private boolean verifyGuest(int no, String rawPassword) {
+		if (rawPassword == null || rawPassword.isBlank()) {
+			return false;
+		}
+		String hash = boardService.getGuestPassword(no);
+		return hash != null && passwordEncoder.matches(rawPassword, hash);
 	}
 
 	/**
@@ -212,10 +279,12 @@ public class BoardController {
 		boardService.vote(no, userDetails.getUsername(), "L");
 		// R-02 알림: 글 작성자에게 (본인 추천이면 생략)
 		BoardVO board = boardService.getDetail(no);
-		if (board != null && !board.getWriterId().equals(userDetails.getUsername())) {
+		if (board != null && board.getWriterId() != null
+				&& !board.getWriterId().equals(userDetails.getUsername())) {
 			notificationService.notify(board.getWriterId(),
 				userDetails.getUsername() + "님이 회원님의 글을 추천했습니다.",
 				"/board/detail?no=" + no);
+			memberService.recalcGrade(board.getWriterId());   // M-08 받은 추천 반영
 		}
 		return "redirect:/board/detail?no=" + no;
 	}
@@ -228,6 +297,10 @@ public class BoardController {
 	public String dislike(@RequestParam("no") int no,
 						  @AuthenticationPrincipal UserDetails userDetails) {
 		boardService.vote(no, userDetails.getUsername(), "D");
+		BoardVO board = boardService.getDetail(no);
+		if (board != null && board.getWriterId() != null) {
+			memberService.recalcGrade(board.getWriterId());   // M-08 추천수 변동 반영
+		}
 		return "redirect:/board/detail?no=" + no;
 	}
 

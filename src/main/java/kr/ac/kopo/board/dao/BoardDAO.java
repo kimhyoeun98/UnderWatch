@@ -27,6 +27,9 @@ public interface BoardDAO {
 	void increaseDislike(int boardNo);
 	void decreaseDislike(int boardNo);
 
+	// B-02 게스트 글 비밀번호 검증
+	String selectGuestPassword(int no);
+
 	// M-05 내가 쓴 글
 	List<BoardVO> selectByWriter(String writerId);
 

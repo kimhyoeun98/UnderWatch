@@ -14,6 +14,25 @@
       <form:form action="${pageContext.request.contextPath}/board/write"
                  method="post" modelAttribute="boardVO" enctype="multipart/form-data">
 
+        <%-- B-02 비로그인 작성: 이름/비밀번호 입력(로그인 상태에서는 숨김) --%>
+        <c:if test="${pageContext.request.userPrincipal == null}">
+          <div class="row g-2 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">작성자 이름 <span class="text-danger">*</span></label>
+              <input type="text" name="guestName" class="form-control" maxlength="50"
+                     placeholder="비로그인 작성자 이름">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">비밀번호 <span class="text-danger">*</span></label>
+              <input type="password" name="guestPassword" class="form-control" maxlength="50"
+                     placeholder="수정/삭제 시 필요">
+            </div>
+            <div class="col-12">
+              <small class="text-muted">비로그인 글은 입력한 비밀번호로만 수정·삭제할 수 있습니다.</small>
+            </div>
+          </div>
+        </c:if>
+
         <div class="mb-3">
           <label class="form-label">카테고리 <span class="text-danger">*</span></label>
           <form:select path="categoryNo" cssClass="form-select">

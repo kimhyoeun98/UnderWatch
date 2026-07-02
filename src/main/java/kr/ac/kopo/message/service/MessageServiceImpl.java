@@ -8,12 +8,16 @@ import org.springframework.stereotype.Service;
 import kr.ac.kopo.message.dao.MessageDAO;
 import kr.ac.kopo.message.vo.ConversationVO;
 import kr.ac.kopo.message.vo.MessageVO;
+import kr.ac.kopo.realtime.NotifyWebSocketHandler;
 
 @Service
 public class MessageServiceImpl implements MessageService {
 
 	@Autowired
 	private MessageDAO messageDAO;
+
+	@Autowired
+	private NotifyWebSocketHandler push;
 
 	@Override
 	public void send(String senderId, String receiverId, String content) {
@@ -22,6 +26,8 @@ public class MessageServiceImpl implements MessageService {
 		m.setReceiverId(receiverId);
 		m.setContent(content);
 		messageDAO.insert(m);
+		// 받는 사람이 접속 중이면 안 읽은 쪽지 배지를 즉시 갱신
+		push.sendBadge(receiverId, "message", messageDAO.countUnread(receiverId));
 	}
 
 	@Override
@@ -52,6 +58,11 @@ public class MessageServiceImpl implements MessageService {
 	@Override
 	public List<MessageVO> getThread(String myId, String partnerId) {
 		return messageDAO.selectThread(myId, partnerId);
+	}
+
+	@Override
+	public List<MessageVO> getThreadForAdmin(String userA, String userB) {
+		return messageDAO.selectThreadForAdmin(userA, userB);
 	}
 
 	@Override

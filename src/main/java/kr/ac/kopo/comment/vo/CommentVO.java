@@ -21,6 +21,8 @@ public class CommentVO {
 	private String isDeleted;
 	private String regDate;
 	private String boardTitle;   // M-05 활동내역: 댓글이 달린 글 제목
+	private int likeCnt;         // I-03 댓글 추천 수
+	private int dislikeCnt;      // I-03 댓글 비추천 수
 	private List<CommentVO> children = new ArrayList<>();
 
 	public int getNo() {
@@ -93,6 +95,22 @@ public class CommentVO {
 
 	public void setBoardTitle(String boardTitle) {
 		this.boardTitle = boardTitle;
+	}
+
+	public int getLikeCnt() {
+		return likeCnt;
+	}
+
+	public void setLikeCnt(int likeCnt) {
+		this.likeCnt = likeCnt;
+	}
+
+	public int getDislikeCnt() {
+		return dislikeCnt;
+	}
+
+	public void setDislikeCnt(int dislikeCnt) {
+		this.dislikeCnt = dislikeCnt;
 	}
 
 	public List<CommentVO> getChildren() {

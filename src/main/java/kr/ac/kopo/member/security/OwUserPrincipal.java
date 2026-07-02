@@ -21,12 +21,18 @@ public class OwUserPrincipal implements UserDetails, OAuth2User {
 	private final String password;                  // 소셜 계정은 null 가능
 	private final String role;                      // 예: ROLE_USER / ROLE_ADMIN
 	private final Map<String, Object> attributes;   // 소셜 원본 속성(폼 로그인은 빈 맵)
+	private final boolean locked;                   // 정지(SUSPENDED) 계정이면 true → LockedException 유발
 
 	public OwUserPrincipal(String id, String password, String role, Map<String, Object> attributes) {
+		this(id, password, role, attributes, false);
+	}
+
+	public OwUserPrincipal(String id, String password, String role, Map<String, Object> attributes, boolean locked) {
 		this.id = id;
 		this.password = password;
 		this.role = role;
 		this.attributes = attributes == null ? Map.of() : attributes;
+		this.locked = locked;
 	}
 
 	@Override
@@ -52,7 +58,7 @@ public class OwUserPrincipal implements UserDetails, OAuth2User {
 
 	@Override
 	public boolean isAccountNonLocked() {
-		return true;
+		return !locked;   // 정지 계정은 잠금 → DaoAuthenticationProvider 가 LockedException 발생
 	}
 
 	@Override

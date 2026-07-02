@@ -14,6 +14,7 @@ public interface MessageService {
 	int countUnread(String receiverId);
 	List<ConversationVO> getConversations(String myId);
 	List<MessageVO> getThread(String myId, String partnerId);
+	List<MessageVO> getThreadForAdmin(String userA, String userB);
 	void readAll(String myId, String partnerId);
 	void deleteForMe(int no, String myId);
 	void leaveConversation(String myId, String partnerId);

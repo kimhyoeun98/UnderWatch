@@ -33,12 +33,12 @@
           </c:if>
           <li class="nav-item">
             <a class="nav-link" href="${pageContext.request.contextPath}/notification">
-              알림<c:if test="${unreadNotifications > 0}"> <span class="badge bg-warning">${unreadNotifications}</span></c:if>
+              알림 <span id="notiBadge" class="badge bg-warning"<c:if test="${unreadNotifications <= 0}"> style="display:none"</c:if>>${unreadNotifications}</span>
             </a>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="${pageContext.request.contextPath}/message">
-              쪽지<c:if test="${unreadMessages > 0}"> <span class="badge bg-warning">${unreadMessages}</span></c:if>
+              쪽지 <span id="msgBadge" class="badge bg-warning"<c:if test="${unreadMessages <= 0}"> style="display:none"</c:if>>${unreadMessages}</span>
             </a>
           </li>
           <li class="nav-item">
@@ -62,6 +62,40 @@
     </div>
   </div>
 </nav>
+
+<c:if test="${pageContext.request.userPrincipal != null}">
+<script>
+(function () {
+  var ctx = '${pageContext.request.contextPath}';
+  function setBadge(id, n) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    if (n > 0) { el.textContent = n; el.style.display = ''; }
+    else { el.style.display = 'none'; }
+  }
+  var ws, retry = 0;
+  function connect() {
+    var proto = (location.protocol === 'https:') ? 'wss://' : 'ws://';
+    ws = new WebSocket(proto + location.host + ctx + '/ws/notify');
+    ws.onopen = function () { retry = 0; };
+    ws.onmessage = function (e) {
+      try {
+        var d = JSON.parse(e.data);
+        if (d.type === 'message') setBadge('msgBadge', d.count);
+        else if (d.type === 'notification') setBadge('notiBadge', d.count);
+      } catch (_) { /* 잘못된 메시지는 무시 */ }
+    };
+    ws.onclose = function () {
+      // 연결이 끊기면 지수 백오프로 재연결 (최대 30초 간격)
+      retry = Math.min(retry + 1, 6);
+      setTimeout(connect, retry * 5000);
+    };
+    ws.onerror = function () { try { ws.close(); } catch (_) {} };
+  }
+  connect();
+})();
+</script>
+</c:if>
 
 <!-- 2. 히어로(로고 배너) — 메인에서만 표시 -->
 <c:if test="${showHero}">
@@ -96,3 +130,9 @@
 </nav>
 
 <main class="ow-main">
+
+<c:if test="${not empty globalMsg}">
+  <div class="container mt-3">
+    <div class="alert alert-info mb-0">${globalMsg}</div>
+  </div>
+</c:if>

@@ -20,6 +20,9 @@ Oracle XE 기반 데이터베이스 구조 문서입니다.
 | 9  | `add_nickname_changed.sql` | 닉네임 변경일           |
 | 10 | `add_oauth.sql`            | 소셜 로그인            |
 | 11 | `add_face.sql`             | 얼굴 로그인            |
+| 12 | `add_comment_vote.sql`     | 댓글 추천 / 비추천       |
+| 13 | `add_guest_board.sql`      | 비회원 게시글 작성        |
+| 14 | `add_withdraw.sql`         | 탈퇴 7일 유예           |
 
 실행 예시:
 
@@ -34,6 +37,7 @@ sqlplus hr/hr@localhost:1521/xe @src/main/resources/sql/schema.sql
 ```text
 ow_member ─┬─< ow_board >─┬─< ow_comment
            │              ├─< ow_board_vote
+           │              ├─< ow_comment_vote
            │              └─ image columns
            ├─< ow_party
            ├─< ow_message
@@ -59,9 +63,10 @@ ow_visit_daily
 | `grade_point`     | 활동 점수         |
 | `profile_img`     | 프로필 이미지       |
 | `status`          | 회원 상태         |
+| `withdraw_at`     | 탈퇴 신청 시각      |
 | `provider`        | 소셜 제공자        |
 | `provider_id`     | 소셜 고유 ID      |
-| `face_descriptor` | (미사용) 얼굴 데이터는 `/face-data` 파일로 저장 |
+| `face_descriptor` | 얼굴 API가 반환한 임베딩 목록 JSON |
 
 ---
 
@@ -71,7 +76,9 @@ ow_visit_daily
 | -------------- | ------- |
 | `no`           | 게시글 번호  |
 | `category_no`  | 카테고리 번호 |
-| `writer_id`    | 작성자     |
+| `writer_id`    | 작성자, 게스트 글은 NULL |
+| `guest_name`   | 게스트 표시 이름 |
+| `guest_password` | 게스트 수정/삭제 확인용 BCrypt 해시 |
 | `title`        | 제목      |
 | `content`      | 내용      |
 | `view_cnt`     | 조회수     |
@@ -92,6 +99,8 @@ ow_visit_daily
 | `parent_no`  | 부모 댓글 번호 |
 | `content`    | 댓글 내용    |
 | `is_deleted` | 삭제 여부    |
+| `like_cnt`   | 추천 수     |
+| `dislike_cnt`| 비추천 수    |
 
 ---
 
@@ -100,6 +109,7 @@ ow_visit_daily
 | 테이블               | 설명           |
 | ----------------- | ------------ |
 | `ow_board_vote`   | 게시글 추천 / 비추천 |
+| `ow_comment_vote` | 댓글 추천 / 비추천 |
 | `ow_report`       | 게시글 / 댓글 신고  |
 | `ow_party`        | 구인구직         |
 | `ow_message`      | 쪽지           |
@@ -122,3 +132,5 @@ ow_visit_daily
 * CDB / PDB 접속 대상 확인
 * 재실행 시 시퀀스 충돌 가능
 * 관리자 계정 해시는 별도 패치 스크립트로 보정 가능
+* 게스트 게시글은 `writer_id`가 NULL일 수 있으므로 목록/상세 조회에서 `NVL(member.nickname, guest_name)`을 사용
+* 탈퇴 회원은 즉시 삭제하지 않고 `status='WITHDRAWN'`, `withdraw_at=SYSDATE`로 7일 보관

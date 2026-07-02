@@ -28,9 +28,9 @@
 
 | 제공자 | 콘솔 | Redirect URI |
 |--------|------|--------------|
-| 구글 | console.cloud.google.com → API/서비스 → 사용자 인증 정보 → OAuth 클라이언트 ID | `http://localhost:8080/UnderWatch/login/oauth2/code/google` |
-| 카카오 | developers.kakao.com → 내 애플리케이션 → 카카오 로그인 | `http://localhost:8080/UnderWatch/login/oauth2/code/kakao` |
-| 네이버 | developers.naver.com → 애플리케이션 등록 | `http://localhost:8080/UnderWatch/login/oauth2/code/naver` |
+| 구글 | console.cloud.google.com → API/서비스 → 사용자 인증 정보 → OAuth 클라이언트 ID | `http://localhost:8080/login/oauth2/code/google` |
+| 카카오 | developers.kakao.com → 내 애플리케이션 → 카카오 로그인 | `http://localhost:8080/login/oauth2/code/kakao` |
+| 네이버 | developers.naver.com → 애플리케이션 등록 | `http://localhost:8080/login/oauth2/code/naver` |
 
 발급된 **client id / secret** 을 메모해 둡니다. (카카오는 REST API 키 = client id, "보안 → Client Secret" 발급)
 
@@ -117,7 +117,7 @@ ALTER TABLE ow_member ADD (provider VARCHAR2(20), provider_id VARCHAR2(100));
 
 ## 6. 주의사항
 
-- **Redirect URI**는 콘솔 등록값과 코드(`{baseUrl}/login/oauth2/code/{registrationId}`)가 정확히 일치해야 함. 컨텍스트 루트(`/UnderWatch`) 포함.
+- **Redirect URI**는 콘솔 등록값과 코드(`{baseUrl}/login/oauth2/code/{registrationId}`)가 정확히 일치해야 함. 현재 로컬 실행 기준은 컨텍스트 루트 `/`입니다.
 - 카카오/네이버는 `CommonOAuth2Provider`에 없어 위처럼 **수동 ClientRegistration** 필요.
 - 비밀번호가 없는 소셜 계정이므로 `ow_member.password`를 NOT NULL로 두면 가입 시 임의 값/난수를 넣거나 컬럼을 nullable로 변경.
 - 운영 환경에서는 https + 실제 도메인으로 Redirect URI 재등록.

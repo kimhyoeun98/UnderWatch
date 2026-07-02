@@ -43,7 +43,7 @@
           AND b.content LIKE '%' || #{keyword} || '%'
         </when>
         <when test="searchType == 'writer'">
-          AND m.nickname LIKE '%' || #{keyword} || '%'
+          AND NVL(m.nickname, b.guest_name) LIKE '%' || #{keyword} || '%'
         </when>
         <otherwise>
           AND (b.title LIKE '%' || #{keyword} || '%'
@@ -57,7 +57,7 @@
   <select id="selectTotalCount" parameterType="searchVO" resultType="int">
     SELECT COUNT(*)
       FROM ow_board b
-      JOIN ow_member m ON b.writer_id = m.id
+      LEFT JOIN ow_member m ON b.writer_id = m.id
     <include refid="searchCondition" />
   </select>
 
@@ -68,13 +68,13 @@
         SELECT ROWNUM AS rn, a.*
           FROM (
             SELECT b.no, b.category_no, c.name AS category_name,
-                   b.writer_id, m.nickname AS writer_nickname,
+                   b.writer_id, NVL(m.nickname, b.guest_name) AS writer_nickname,
                    b.title, b.view_cnt, b.like_cnt, b.is_deleted,
                    TO_CHAR(b.reg_date, 'yyyy-mm-dd') AS reg_date,
                    (SELECT COUNT(*) FROM ow_comment
                      WHERE board_no = b.no AND is_deleted = 'N') AS comment_cnt
               FROM ow_board b
-              JOIN ow_member m ON b.writer_id = m.id
+              LEFT JOIN ow_member m ON b.writer_id = m.id
               JOIN ow_board_category c ON b.category_no = c.no
             <include refid="searchCondition" />
              ORDER BY b.no DESC
@@ -87,24 +87,29 @@
   <!-- 단건 상세 조회 -->
   <select id="selectOne" parameterType="int" resultType="boardVO">
     SELECT b.no, b.category_no, c.name AS category_name,
-           b.writer_id, m.nickname AS writer_nickname,
-           b.title, b.content, b.view_cnt, b.like_cnt, b.dislike_cnt,
+           b.writer_id, NVL(m.nickname, b.guest_name) AS writer_nickname,
+           b.guest_name, b.title, b.content, b.view_cnt, b.like_cnt, b.dislike_cnt,
            b.is_deleted, b.image_stored, b.image_orig,
            TO_CHAR(b.reg_date,    'yyyy-mm-dd hh24:mi') AS reg_date,
            TO_CHAR(b.update_date, 'yyyy-mm-dd hh24:mi') AS update_date
       FROM ow_board b
-      JOIN ow_member m ON b.writer_id = m.id
+      LEFT JOIN ow_member m ON b.writer_id = m.id
       JOIN ow_board_category c ON b.category_no = c.no
      WHERE b.no = #{no}
   </select>
 
-  <!-- 게시글 작성 -->
+  <!-- B-02 게스트 글 비밀번호 해시 조회(수정/삭제 검증용) -->
+  <select id="selectGuestPassword" parameterType="int" resultType="string">
+    SELECT guest_password FROM ow_board WHERE no = #{no}
+  </select>
+
+  <!-- 게시글 작성 (회원: writer_id / 비로그인: guest_name + guest_password) -->
   <insert id="insert" parameterType="boardVO">
     <selectKey keyProperty="no" resultType="int" order="BEFORE">
       SELECT seq_ow_board_no.NEXTVAL FROM DUAL
     </selectKey>
-    INSERT INTO ow_board(no, category_no, writer_id, title, content)
-    VALUES(#{no}, #{categoryNo}, #{writerId}, #{title}, #{content})
+    INSERT INTO ow_board(no, category_no, writer_id, title, content, guest_name, guest_password)
+    VALUES(#{no}, #{categoryNo}, #{writerId}, #{title}, #{content}, #{guestName}, #{guestPassword})
   </insert>
 
   <!-- 게시글 수정 -->

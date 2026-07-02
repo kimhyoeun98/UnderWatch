@@ -8,5 +8,6 @@ public interface ReportService {
 
 	boolean report(String targetType, int targetNo, String reporterId, String reason);   // false=중복신고
 	List<ReportVO> getReports();
+	ReportVO getReport(int no);
 	void resolve(int no);
 }

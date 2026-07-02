@@ -22,13 +22,22 @@ public class ReportController {
 	 */
 	@PostMapping("/report")
 	public String report(@RequestParam("targetType") String targetType,
-						 @RequestParam("targetNo") int targetNo,
-						 @RequestParam("boardNo") int boardNo,
+						 @RequestParam(value = "targetNo", required = false, defaultValue = "0") int targetNo,
+						 @RequestParam(value = "boardNo", required = false) Integer boardNo,
+						 @RequestParam(value = "partnerId", required = false) String partnerId,
 						 @RequestParam(value = "reason", required = false) String reason,
 						 @AuthenticationPrincipal UserDetails userDetails,
 						 RedirectAttributes ra) {
-		boolean ok = reportService.report(targetType, targetNo, userDetails.getUsername(), reason);
+		// R-03 쪽지 신고: 신고 대상(상대 아이디)을 사유에 함께 기록
+		String finalReason = reason;
+		if ("M".equals(targetType) && partnerId != null && !partnerId.isBlank()) {
+			finalReason = "[쪽지 상대: " + partnerId + "] " + (reason == null ? "" : reason);
+		}
+		boolean ok = reportService.report(targetType, targetNo, userDetails.getUsername(), finalReason);
 		ra.addFlashAttribute("reportMsg", ok ? "신고가 접수되었습니다." : "이미 신고한 대상입니다.");
+		if ("M".equals(targetType)) {
+			return "redirect:/message";
+		}
 		return "redirect:/board/detail?no=" + boardNo;
 	}
 }
